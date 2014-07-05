@@ -41,9 +41,16 @@ string GetNext(ifstream *stream)
 {
 	string token = "";
 	char read = stream->get();
+	
 	//Skip whitespace
 	while (iswspace(read))
 	{
+		//Return '\n' if found
+		if (read == '\n') 
+		{
+			token += read;
+			return token;
+		}
 		read = stream->get();
 	}
 	//If word, keep adding char to token
