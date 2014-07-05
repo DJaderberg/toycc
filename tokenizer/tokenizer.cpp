@@ -46,41 +46,36 @@ string GetNext(ifstream *stream)
 	{
 		read = stream->get();
 	}
-	//If delimiter, store and return
-	if (read == '(' || read == ')' 
-		|| read == '{' || read == '}'
-		|| read == '[' || read == ']')
-	{
-		token += read;
-		return token;
-	}
-	//If (semi-)colon, store and return
-	if (read == ';' || read == ':' || read == ',')
-	{
-		token += read;
-		return token;
-	}
 	//If word, keep adding char to token
-	if (is_name(read))
+	if (is_name_first(read))
 	{
 		token += read;
-		//If alphanumeric, still part of the same token
-		while(iswalnum(stream->peek()))
+		//If alphanumeric or '_', still part of the same token
+		while(is_name(stream->peek()))
 		{
 			token += stream->get();
 		}
+		return token;
+	} else {
+		token += read;
 	}
 	return token;
 }
 
-//! Returns whether ch is a char that could be part of a name
-inline int is_name(char ch)
+//! Returns whether ch could be the first character of a name
+inline int is_name_first(char ch)
 {
 	return (iswalpha(ch) || ch == '_');
+}
+
+//! Returns whether ch could be a character in a name
+inline int is_name(char ch)
+{
+	return (iswalnum(ch) || ch == '_');
 }
 
 //! Returns whether ch is a char that could be part of a number 
 inline int is_number(char ch)
 {
-	return (iswalpha(ch) || ch == '_');
+	return iswxdigit(ch);
 }
