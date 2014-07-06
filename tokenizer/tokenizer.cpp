@@ -69,6 +69,12 @@ string GetNext(ifstream *stream)
 	return token;
 }
 
+Tokenizer::Tokenizer(string filename) {
+	this->stream = ifstream(filename);
+	this->curLine = 1;
+	this->curColumn = 0;
+}
+
 //! Returns whether ch could be the first character of a name
 inline int is_name_first(char ch)
 {
