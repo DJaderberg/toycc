@@ -15,6 +15,7 @@ class Token {
 		unsigned int getLine() {return line;}
 		unsigned int getColumn() {return column;}
 		string getString() {return str;}
+		void setString(string str) {this->str = str;} 
 	private:
 		unsigned int line;
 		unsigned int column;
@@ -25,6 +26,7 @@ class Tokenizer {
 	public:
 		Tokenizer(string filename);
 		Token getNext();
+		bool eof() {return this->stream.eof();}
 	private:
 		unsigned int curLine;
 		unsigned int curColumn;

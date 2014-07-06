@@ -6,21 +6,16 @@
 
 int main() {
 	string line;
-	string token;
-	ifstream file("tokenizer.h");
+	Token token;
+	Tokenizer tokenizer("tokenizer.h");
 
-	if (file.is_open())
-	{
-		while(!file.eof())
+		while(!tokenizer.eof())
 		{
 			unsigned int start = 0;
-			token = GetNext(&file);
-			cout << token << '\n';
-			start += token.length();
+			token = tokenizer.getNext();
+			cout << token.getString() << '\n';
+			start += token.getString().length();
 		}
-	} else {
-		cout << "Unable to open file.\n";
-	}
 	return 0;
 }
 
@@ -37,36 +32,41 @@ int main() {
  * @param stream A stream of a file to be read.
  * @param return The next useful token in the stream.
  */
-string GetNext(ifstream *stream)
+Token Tokenizer::getNext()
 {
-	string token = "";
-	char read = stream->get();
-	
+	string str = "";
+	char read = this->stream.get();
+	this->curColumn++;
+
 	//Skip whitespace
 	while (iswspace(read))
 	{
+		this->curColumn++;
 		//Return '\n' if found
 		if (read == '\n') 
 		{
-			token += read;
-			return token;
+			str += read;
+			this->curColumn = 1;
+			
+			return Token(++this->curLine, this->curColumn, str);
 		}
-		read = stream->get();
+		read = this->stream.get();
 	}
 	//If word, keep adding char to token
 	if (is_name_first(read))
 	{
-		token += read;
+		str += read;
 		//If alphanumeric or '_', still part of the same token
-		while(is_name(stream->peek()))
+		while(is_name(this->stream.peek()))
 		{
-			token += stream->get();
+			str += this->stream.get();
+			this->curColumn++;
 		}
-		return token;
+		return Token(this->curLine, this->curColumn, str);
 	} else {
-		token += read;
+		str += read;
 	}
-	return token;
+	return Token(this->curLine, this->curColumn, str);
 }
 
 Tokenizer::Tokenizer(string filename) {
