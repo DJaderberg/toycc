@@ -4,10 +4,15 @@
 
 #include "tokenizer.h"
 
-int main() {
-	string line;
+int main(int argc, char *argv[]) {
 	Token token;
-	Tokenizer tokenizer("tokenizer.h");
+	string filename;
+	if (argc > 1) {
+		filename = argv[1];	
+	} else {
+		filename = "tokenizer.h";
+	}
+	Tokenizer tokenizer(argv[1]);
 
 		while(!tokenizer.eof())
 		{
@@ -19,7 +24,7 @@ int main() {
 	return 0;
 }
 
-//! Returns the next token in str, starting at start
+//! Returns the next token in the stream in the tokenizer 
 /* !
  * This function returns the next token from the input stream.
  * It aims to do one of three things when running:
@@ -92,3 +97,4 @@ inline int is_number(char ch)
 {
 	return iswxdigit(ch);
 }
+
