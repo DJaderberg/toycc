@@ -31,9 +31,57 @@ int phase1(istream *input, ostream *output) {
 			eof = true;
 			break;
 		}
+		//Check for trigraph sequence
+		input->unget();
+		read = trigraph(input);
 		*output << read;
 	}
 	return 0;
+}
+
+char trigraph(istream *input) {
+	char read = input->get();
+	/* If possible trigraph, check if third graph also matches and
+	 * if so, return the converted character, otherwise return first
+	 * character.
+	 */
+	if (read == '?' && input->peek() == '?') {
+		input->get();
+		switch (input->get()) {
+			case '=': 
+				read = '#';
+				break;
+			case '(':
+				read = '[';
+				break;
+			case '/':
+				read = '\\';
+				break;
+			case ')':
+				read = ']';
+				break;
+			case '\'':
+				read = '^';
+				break;
+			case '<':
+				read = '{';
+				break;
+			case '!':
+				read = '|';
+				break;
+			case '>':
+				read = '}';
+				break;
+			case '-':
+				read = '~';
+				break;
+			default:
+				input->unget();
+				input->unget();
+				break;
+		}
+	}
+	return read;
 }
 
 int phase2(istream *input, ostream *output) {
@@ -51,4 +99,5 @@ int phase2(istream *input, ostream *output) {
 		output->put(read);
 	}
 	return 0;
-}
+??>
+
