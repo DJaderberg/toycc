@@ -10,6 +10,18 @@ int phase1(istream *input, ostream *output);
 char trigraph(istream *input);
 int phase2(istream *input, ostream *output);
 
+class Position {
+	public:
+		Position() : line(0), column(0) {}
+		Position(unsigned int l, unsigned int c) : line(l), column(c) {}
+		unsigned int getLine() {return line;}
+		unsigned int getColumn() {return column;}
+		void setLine(unsigned int input) {line = input;}
+		void setColumn(unsigned int input) {column = input;}
+	private:
+		unsigned int line;
+		unsigned int column;
+};
 /*! The source class represents a source of the type,
  * e.g. a stream such as istream.
  */
@@ -20,6 +32,9 @@ class Source
 		virtual T get() = 0; //Gets the next item from the source
 		virtual bool empty() const = 0; //True if source has no more items
 		virtual ~Source() {}
+		Position getPosition() {return position;}
+	private:
+		Position position;
 };
 
 template<class T> 
@@ -44,9 +59,19 @@ class Phase : public Source<To>, public Mapping<From, To> {
 	private:
 		Source<From>& source;
 };
+
 //! A lexer performs translation phase 3
-class Lexer : public Phase<char, PPToken> {
+class Lexer : public Phase<char, PPToken> {	
 	public:
-		
+		Lexer(Source<char>& s) : Phase(s) {}
+};
+
+//! A preprocessor performs translation phase 4
+class Preprocessor : public Phase<PPToken, PPToken> {
+	public:
+		Preprocessor(Lexer& s) : Phase(s), lexer(s) {}
+		PPToken get() {return lexer.get();}
+	private:
+		Lexer& lexer;
 };
 

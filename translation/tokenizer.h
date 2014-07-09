@@ -25,6 +25,7 @@ class Token {
 };
 
 enum PPTokenKey { IDENTIFIER, WHITESPACE };
+
 //! A preprocessing token used in phases 3 to 7
 class PPToken : public Token {
 	public:

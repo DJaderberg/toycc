@@ -26,6 +26,7 @@ int translate(string filename) {
 	 * via StreamSource<char>
 	 */
 	StreamSource<char> *lexSource = new StreamSource<char>(stream2to3);
+	//Lexer lexer = new Lexer(lexSource); //Can't do this yet, Lexer not implemented
 	while (!lexSource->empty()) {
 		cout << lexSource->get();
 	}
