@@ -20,6 +20,15 @@ int translate(string filename) {
                               | std::ios_base::app);
 	phase1(&filestream, &stream1to2);
 	phase2(&stream1to2 , &stream2to3);
+
+	/*After the first two, very simple, phases, introduce some 
+	 * object-orientation. First, turn stream2to3 into a Source<char>
+	 * via StreamSource<char>
+	 */
+	StreamSource<char> *lexSource = new StreamSource<char>(stream2to3);
+	while (!lexSource->empty()) {
+		cout << lexSource->get();
+	}
 	return 0;
 }
 
@@ -99,5 +108,5 @@ int phase2(istream *input, ostream *output) {
 		output->put(read);
 	}
 	return 0;
-??>
+}
 

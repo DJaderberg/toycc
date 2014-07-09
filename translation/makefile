@@ -2,10 +2,13 @@ CC      = g++
 CFLAGS  = -Wall -Wextra -Werror -std=c++11
 LDFLAGS = 
 
-all: tokenizer clean
+all: translation clean
 
-tokenizer: tokenizer.o
+translation: translation.o 
 	$(CC) -o $@ $^ $(LDFLAGS)
+
+translation.o: translation.cpp translation.h
+	$(CC) -c $(CFLAGS) $<
 
 tokenizer.o: tokenizer.cpp tokenizer.h
 	$(CC) -c $(CFLAGS) $<
@@ -16,4 +19,4 @@ clean:
 	rm *.o
 
 cleanest: clean
-	rm tokenizer
+	rm translation

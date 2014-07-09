@@ -13,15 +13,27 @@ string GetNext(ifstream *stream);
 class Token {
 	public:
 		Token(unsigned int line = 0, unsigned int column = 0, \
-				string str = ""): line(line), column(column), str(str) {};
+				string name = ""): line(line), column(column), name(name) {};
 		unsigned int getLine() {return line;}
 		unsigned int getColumn() {return column;}
-		string getString() {return str;}
-		void setString(string str) {this->str = str;} 
+		string getString() {return name;}
+		void setString(string name) {this->name = name;} 
 	private:
 		unsigned int line;
 		unsigned int column;
-		string str;
+		string name;
+};
+
+enum PPTokenKey { IDENTIFIER, WHITESPACE };
+//! A preprocessing token used in phases 3 to 7
+class PPToken : public Token {
+	public:
+		PPToken(unsigned int line = 0, unsigned int column = 0, \
+				string name = "", PPTokenKey id = IDENTIFIER) : \
+			Token(line, column, name), id(id) {}
+		PPTokenKey getKey() {return id;};
+	private:
+		PPTokenKey id;
 };
 
 //! A class holding a stream, which can hand back tokens from the stream
