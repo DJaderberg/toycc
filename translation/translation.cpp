@@ -25,10 +25,10 @@ int translate(string filename) {
 	 * object-orientation. First, turn stream2to3 into a Source<char>
 	 * via StreamSource<char>
 	 */
-	StreamSource<char> *lexSource = new StreamSource<char>(stream2to3);
-	//Lexer lexer = new Lexer(lexSource); //Can't do this yet, Lexer not implemented
-	while (!lexSource->empty()) {
-		cout << lexSource->get();
+	StreamSource<char> lexSource = *new StreamSource<char>(stream2to3);
+	Lexer lexer = *new Lexer(lexSource); 
+	while (!lexer.empty()) {
+		cout << lexer.get().getName();
 	}
 	return 0;
 }

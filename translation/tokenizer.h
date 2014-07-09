@@ -16,15 +16,15 @@ class Token {
 				string name = ""): line(line), column(column), name(name) {};
 		unsigned int getLine() {return line;}
 		unsigned int getColumn() {return column;}
-		string getString() {return name;}
-		void setString(string name) {this->name = name;} 
+		string getName() {return name;}
+		void setName(string name) {this->name = name;} 
 	private:
 		unsigned int line;
 		unsigned int column;
 		string name;
 };
 
-enum PPTokenKey { IDENTIFIER, WHITESPACE };
+enum PPTokenKey { IDENTIFIER, WHITESPACE }; //Not a complete list yet
 
 //! A preprocessing token used in phases 3 to 7
 class PPToken : public Token {
