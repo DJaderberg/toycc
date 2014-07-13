@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <deque>
 #include "tokenizer.h"
 using namespace std;
 
@@ -32,15 +33,49 @@ class Source
 		virtual T get() = 0; //Gets the next item from the source
 		virtual bool empty() = 0; //True if source has no more items
 		virtual ~Source() {}
-		Position getPosition() {return position;}
+		Position getPosition() {return this->position;}
+		void incrementPosition(unsigned int line, unsigned int column)
+		{
+			this->position.setLine(line+this->position.getLine());
+			this->position.setColumn(column+this->position.getColumn());
+		}
+		void incrementPosition(Position inc)
+		{
+			this->incrementPosition(inc.getLine(), inc.getColumn());
+		}
 	private:
 		Position position;
 };
 
+template<class T>
+class BufferedSource : public Source<T> {
+	public:
+		BufferedSource(Source<T>* s) : source(s), que(*new deque<T>()) {
+				this->used = 0;
+			}
+		T get();
+		void reset() {used = 0;} //Move stream back to beginning of buffer
+		void clear() {
+			while (!que.empty()) {
+				que.pop_front();
+			}
+			used = 0;
+		} //Empty buffer and move stream to first token that hasn't been read 
+		bool empty() {return source->empty() && (this->used >= \
+				this->que.size());}
+		virtual ~BufferedSource() {}
+	private:
+		unsigned int used;
+		Source<T>* source;
+		deque<T>& que;
+};
+
 template<class T> 
-class StreamSource : public Source<T> {
+class StreamSource : public virtual Source<T> {
 	public:
 	   	StreamSource(basic_istream<T>& i) : inputstream(i) {}
+		StreamSource(string filename) : inputstream\
+										(*new ifstream(filename)) {}
 		virtual T get() {T c; inputstream.get(c); return c;}
 		bool empty() {return inputstream.eof();}
 		virtual ~StreamSource() {}
@@ -55,29 +90,26 @@ class Mapping {
 template<class From, class To>
 class Phase : public Source<To>, public Mapping<From, To> {
 	public:
-		Phase(Source<From>& s) : source(s) {}
+		Phase(string filename) : source(*new StreamSource<From>(filename)) {}
+		Phase(Source<From> *s) : source(*s) {}
 		Source<From>& source;
 };
 
 //! A lexer performs translation phase 3
 class Lexer : public Phase<char, PPToken> {	
 	public:
-		Lexer(Source<char>& s) : Phase(s) {}
-		PPToken get() {
-			PPToken pptoken = PPToken(0, 0, string(1,source.get()), \
-					IDENTIFIER);
-			return pptoken;
-		}
-		bool empty() {return source.empty();}
+		Lexer(BufferedSource<char>* s) : Phase(s), bufSource(s) {}
+		PPToken get();
+		bool empty() {return bufSource->empty();}
+	private:
+		BufferedSource<char>* bufSource;
 };
 
 //! A preprocessor performs translation phase 4
-class Preprocessor : public Phase<PPToken, PPToken> {
+/*class Preprocessor : public Phase<PPToken, PPToken> {
 	public:
 		Preprocessor(Lexer& s) : Phase(s), lexer(s) {}
 		PPToken get() {return lexer.get();}
 		bool empty() {return lexer.empty();}
-	private:
-		Lexer& lexer;
-};
+};*/
 

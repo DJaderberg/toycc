@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 		while(!tokenizer.eof())
 		{
 			unsigned int start = 0;
-			token = tokenizer.getNext();
+			token = tokenizer.get();
 			cout << token.getString() << '\n';
 			start += token.getString().length();
 		}
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
  * @param stream A stream of a file to be read.
  * @param return The next useful token in the stream.
  */
-Token Tokenizer::getNext()
+Token Tokenizer::get()
 {
 	string str = "";
 	char read = this->stream.get();

@@ -7,7 +7,6 @@ int main(int argc, char *argv[]);
 inline int is_name_first(char ch);
 inline int is_name(char ch);
 inline int is_number(char ch);
-string GetNext(ifstream *stream);
 
 //! A token, i.e. a character or a word
 class Token {
@@ -41,7 +40,7 @@ class PPToken : public Token {
 class Tokenizer {
 	public:
 		Tokenizer(string filename);
-		Token getNext();
+		Token get();
 		bool eof() {return this->stream.eof();}
 	private:
 		unsigned int curLine;

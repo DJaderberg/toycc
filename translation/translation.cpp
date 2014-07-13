@@ -25,10 +25,14 @@ int translate(string filename) {
 	 * object-orientation. First, turn stream2to3 into a Source<char>
 	 * via StreamSource<char>
 	 */
-	StreamSource<char> lexSource = *new StreamSource<char>(stream2to3);
-	Lexer lexer = *new Lexer(lexSource); 
-	while (!lexer.empty()) {
-		cout << lexer.get().getName();
+	StreamSource<char>* lexSource = new StreamSource<char>(stream2to3);
+	BufferedSource<char>* bufLexSource = new BufferedSource<char>(lexSource);
+	Lexer* lexer = new Lexer(bufLexSource); 
+	int i = 0;
+	while (!lexer->empty()) {
+		cout << lexer->get().getName();
+		++i;
+		if (i%10 == 0) bufLexSource->clear();
 	}
 	return 0;
 }
@@ -109,5 +113,27 @@ int phase2(istream *input, ostream *output) {
 		output->put(read);
 	}
 	return 0;
+}
+
+template <class T>
+T BufferedSource<T> :: get() {
+	//If we've already used all items we've fetched from the unbuffered source, 
+	//fetch one more, add it to the buffer and return it.
+	if (this->used >= this->que.size()) {
+		T gotten = this->source->get();
+		que.push_back(gotten);
+		used++; //Since we're using the item that we just got
+		return gotten;
+		//Otherwise, return the next element in the buffer and move one step
+	} else {
+		return que.at(used++);
+	}
+}
+
+PPToken Lexer :: get() {
+			PPToken pptoken = PPToken(0, 0, string(1, source.get()), \
+					IDENTIFIER);
+			return pptoken;
+
 }
 
