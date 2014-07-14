@@ -123,5 +123,8 @@ int phase1(istream *input, ostream *output);
 char trigraph(istream *input);
 int phase2(istream *input, ostream *output);
 bool isBaseChar(char c);
+string matchComment(Source<char>* source);
 string matchHeaderName(Source<char>* source);
 string matchIdentifier(Source<char>* source);
+string matchPunctuator(Source<char>* source);
+string matchPPNumber(Source<char>* source);

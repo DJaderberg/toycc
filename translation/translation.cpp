@@ -31,10 +31,11 @@ int translate(string filename) {
 	while (true) {
 		PPToken token = lexer->get();
 		string current = token.getName();
-		PPTokenKey key = token.getKey();
+		//PPTokenKey key = token.getKey();
 		if (current.length() > 0)
 		{
-			cout << current << ": " << key << '\n';
+			//cout << current << ": " << key << '\n';
+			cout << current;
 		}
 		if (lexer->empty())
 		{
@@ -143,6 +144,15 @@ PPToken Lexer :: get() {
 	PPTokenKey key = OTHER;
 	string str = "";
 	string testStr = "";
+	//Waste comments
+	testStr = matchComment(bufSource);
+	if (testStr.length() > 0) {
+		key = OTHER;
+		PPToken ppt= PPToken(0, 0, " ", key);
+		return ppt;
+	}
+	this->bufSource->reset();
+
 	//Match identifier
 	testStr = matchIdentifier(bufSource);
 	if (testStr.length() > str.length()) {
@@ -152,12 +162,12 @@ PPToken Lexer :: get() {
 	this->bufSource->reset();
 	//Match header name
 	//Only to be done within an '#include', should be changed?
-	testStr = matchHeaderName(bufSource);
+	/*testStr = matchHeaderName(bufSource);
 	if (testStr.length() > str.length()) {
 		key = HEADERNAME;
 		str = testStr;
 	}
-	this->bufSource->reset();
+	this->bufSource->reset();*/
 
 	//Match other
 	if (str.length() == 0)
@@ -170,6 +180,24 @@ PPToken Lexer :: get() {
 	PPToken pptoken = PPToken(0, 0,str, key);
 	return pptoken;
 
+}
+
+string matchComment(Source<char>* source) {
+	string out = "";
+	char current = source->get();
+	if (current == '/') {
+		current = source->get();
+		if (current == '/') {
+			while (source->get() != '\n') ;
+			source->get();
+			return " ";
+		} else if (current == '*') {
+			while (!(source->get() == '*' && source->get() == '/')) ;
+			source->get();
+			return " ";
+		}
+	}
+	return "";
 }
 
 string matchIdentifier(Source<char>* source) {
