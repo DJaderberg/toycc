@@ -23,7 +23,8 @@ class Token {
 		string name;
 };
 
-enum PPTokenKey { IDENTIFIER, WHITESPACE }; //Not a complete list yet
+enum PPTokenKey { HEADERNAME, IDENTIFIER, PPNUMBER, CHARACTERCONSTANT, \
+   STRINGLITERAL, PUNCTUATOR, OTHER }; 
 
 //! A preprocessing token used in phases 3 to 7
 class PPToken : public Token {
