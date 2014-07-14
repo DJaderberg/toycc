@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		filename = argv[1];
 	} else {
-		filename = "translation.h";
+		filename = "/Users/david/parprog-2/quicksort/common.c";
 	}
 	return translate(filename);
 }
@@ -28,11 +28,20 @@ int translate(string filename) {
 	StreamSource<char>* lexSource = new StreamSource<char>(stream2to3);
 	BufferedSource<char>* bufLexSource = new BufferedSource<char>(lexSource);
 	Lexer* lexer = new Lexer(bufLexSource); 
-	int i = 0;
-	while (!lexer->empty()) {
-		cout << lexer->get().getName();
-		++i;
-		if (i%10 == 0) bufLexSource->clear();
+	while (true) {
+		PPToken token = lexer->get();
+		string current = token.getName();
+		PPTokenKey key = token.getKey();
+		if (current.length() > 0)
+		{
+			cout << current << ": " << key << '\n';
+		}
+		if (lexer->empty())
+		{
+			break;
+		}
+		bufLexSource->trim(1);
+		bufLexSource->reset();
 	}
 	return 0;
 }
@@ -131,9 +140,83 @@ T BufferedSource<T> :: get() {
 }
 
 PPToken Lexer :: get() {
-			PPToken pptoken = PPToken(0, 0, string(1, source.get()), \
-					IDENTIFIER);
-			return pptoken;
+	PPTokenKey key = OTHER;
+	string str = "";
+	string testStr = "";
+	//Match identifier
+	testStr = matchIdentifier(bufSource);
+	if (testStr.length() > str.length()) {
+		key = IDENTIFIER;
+		str = testStr;
+	}
+	this->bufSource->reset();
+	//Match header name
+	//Only to be done within an '#include', should be changed?
+	testStr = matchHeaderName(bufSource);
+	if (testStr.length() > str.length()) {
+		key = HEADERNAME;
+		str = testStr;
+	}
+	this->bufSource->reset();
+
+	//Match other
+	if (str.length() == 0)
+	{
+		str += bufSource->get();
+		key = OTHER;
+		bufSource->get();
+	}
+	bufSource->reset();
+	PPToken pptoken = PPToken(0, 0,str, key);
+	return pptoken;
 
 }
 
+string matchIdentifier(Source<char>* source) {
+	string out = "";
+	char current = source->get();
+	if (isalpha(current) || current == '_')
+	{
+		out += current;
+		current = source->get();
+		while (isalnum(current) || current == '_')
+		{
+			out += current;
+			current = source->get();
+		}
+	}
+	return out;
+}
+
+bool isBaseChar(char c) {
+	return (isspace(c) || (isprint(c) && c != '$' && c != '@'));
+}
+
+string matchHeaderName(Source<char>* source) {
+	string out = "";
+	char current = source->get();
+	if (current == '<' || current == '\"')
+	{
+		char end = '>';
+		if (current == '\"') {
+			end = '\"';
+		}
+		out += current;
+		current = source->get();
+		while (isBaseChar(current) && current != '\n' && current != end) {
+			out += current;
+			current = source->get();
+		}
+		if (current == end) {
+			out += current;
+			source->get();
+			return out;
+		} else {
+			return "";
+		}
+	} else {
+		//out += current; //Remove after bugtesting
+		return out;
+	}
+	return out;
+}

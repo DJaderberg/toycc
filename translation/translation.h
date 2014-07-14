@@ -6,10 +6,6 @@
 #include "tokenizer.h"
 using namespace std;
 
-int translate(string filename);
-int phase1(istream *input, ostream *output);
-char trigraph(istream *input);
-int phase2(istream *input, ostream *output);
 
 class Position {
 	public:
@@ -45,6 +41,7 @@ class Source
 		}
 	private:
 		Position position;
+		
 };
 
 template<class T>
@@ -56,14 +53,21 @@ class BufferedSource : public Source<T> {
 		T get();
 		void reset() {used = 0;} //Move stream back to beginning of buffer
 		void clear() {
-			while (!que.empty()) {
+			this->trim(0);
+			this->reset();
+		}
+		void trim(unsigned int leave) {
+			while (que.size() > leave) {
 				que.pop_front();
 			}
 			used = 0;
-		} //Empty buffer and move stream to first token that hasn't been read 
-		bool empty() {return source->empty() && (this->used >= \
-				this->que.size());}
+		} //Trim down buffer to the size of leave (if needed) and reset to beginning
+		//of trimmed buffer
+		/*bool empty() {return source->empty() && (this->used >= \
+				this->que.size());}*/
+		bool empty() {return source->empty();}
 		virtual ~BufferedSource() {}
+		unsigned int bufferSize() {return used;}
 	private:
 		unsigned int used;
 		Source<T>* source;
@@ -113,3 +117,11 @@ class Lexer : public Phase<char, PPToken> {
 		bool empty() {return lexer.empty();}
 };*/
 
+
+int translate(string filename);
+int phase1(istream *input, ostream *output);
+char trigraph(istream *input);
+int phase2(istream *input, ostream *output);
+bool isBaseChar(char c);
+string matchHeaderName(Source<char>* source);
+string matchIdentifier(Source<char>* source);
