@@ -4,6 +4,7 @@
 #include <sstream>
 #include <deque>
 #include "tokenizer.h"
+
 using namespace std;
 
 
@@ -44,9 +45,24 @@ class Source
 		
 };
 
+template<class T> 
+class StreamSource : public virtual Source<T> {
+	public:
+	   	StreamSource(basic_istream<T>* i) : inputstream(i) {}
+		StreamSource(string filename) : inputstream\
+										(new ifstream(filename)) {}
+		virtual T get() {T c; inputstream->get(c); return c;}
+		bool empty() {return inputstream->eof();}
+		virtual ~StreamSource() {delete inputstream;}
+	private:
+		basic_istream<T>* inputstream;
+};
+
 template<class T>
 class BufferedSource : public Source<T> {
 	public:
+		BufferedSource(string filename) : source(new StreamSource<char>(filename)), \
+				que(*new deque<T>()) {this->used = 0;}
 		BufferedSource(Source<T>* s) : source(s), que(*new deque<T>()) {
 				this->used = 0;
 			}
@@ -74,18 +90,6 @@ class BufferedSource : public Source<T> {
 		deque<T>& que;
 };
 
-template<class T> 
-class StreamSource : public virtual Source<T> {
-	public:
-	   	StreamSource(basic_istream<T>& i) : inputstream(i) {}
-		StreamSource(string filename) : inputstream\
-										(*new ifstream(filename)) {}
-		virtual T get() {T c; inputstream.get(c); return c;}
-		bool empty() {return inputstream.eof();}
-		virtual ~StreamSource() {}
-	private:
-		basic_istream<T>& inputstream;
-};
 
 template<class From, class To>
 class Mapping {
@@ -105,18 +109,45 @@ class Lexer : public Phase<char, PPToken> {
 		Lexer(BufferedSource<char>* s) : Phase(s), bufSource(s) {}
 		PPToken get();
 		bool empty() {return bufSource->empty();}
+		PPToken matchHeaderName();
 	private:
 		BufferedSource<char>* bufSource;
 };
 
-//! A preprocessor performs translation phase 4
-/*class Preprocessor : public Phase<PPToken, PPToken> {
-	public:
-		Preprocessor(Lexer& s) : Phase(s), lexer(s) {}
-		PPToken get() {return lexer.get();}
-		bool empty() {return lexer.empty();}
-};*/
 
+//! A preprocessor performs translation phase 4
+class Preprocessor : public Phase<char, PPToken> {
+	public:
+		Preprocessor(string filename);
+		//Preprocessor(Lexer* s) : Phase(s), lexer(s) {}
+		PPToken get();
+		bool empty() {return lexer->empty();}
+		~Preprocessor() {
+			delete lexSource;
+			delete bufLexSource;
+			delete lexer;
+			if (usingCache) {
+				delete cache;
+			}
+		}
+	private:
+		Lexer* lexer;
+		string filename; //Could be removed? Used only for reporting errors
+		ifstream filestream;
+		stringstream stream12;
+		stringstream stream23;
+		StreamSource<char>* lexSource;
+		BufferedSource<char>* bufLexSource;
+		bool usingCache;
+		Preprocessor* cache;
+};
+
+//! A type of exception relating input/output operations
+class IOException : public runtime_error {
+	public:
+		IOException(string w) : runtime_error(w) {}
+		IOException(char* w) : runtime_error(w) {}
+};
 
 int translate(string filename);
 int phase1(istream *input, ostream *output);
@@ -124,7 +155,7 @@ char trigraph(istream *input);
 int phase2(istream *input, ostream *output);
 bool isBaseChar(char c);
 string matchComment(Source<char>* source);
-string matchHeaderName(Source<char>* source);
 string matchIdentifier(Source<char>* source);
 string matchPunctuator(Source<char>* source);
 string matchPPNumber(Source<char>* source);
+

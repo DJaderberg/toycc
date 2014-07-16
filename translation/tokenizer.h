@@ -23,8 +23,8 @@ class Token {
 		string name;
 };
 
-enum PPTokenKey { HEADERNAME, IDENTIFIER, PPNUMBER, CHARACTERCONSTANT, \
-   STRINGLITERAL, PUNCTUATOR, OTHER }; 
+enum PPTokenKey { OTHER,  HEADERNAME, IDENTIFIER, PPNUMBER, CHARACTERCONSTANT, \
+   STRINGLITERAL, PUNCTUATOR}; 
 
 //! A preprocessing token used in phases 3 to 7
 class PPToken : public Token {
@@ -48,3 +48,4 @@ class Tokenizer {
 		unsigned int curColumn;
 		ifstream stream;
 };
+

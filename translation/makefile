@@ -2,9 +2,9 @@ CC      = g++
 CFLAGS  = -Wall -Wextra -Werror -std=c++11
 LDFLAGS = 
 
-all: translation clean
+all: translation 
 
-translation: translation.o 
+translation: translation.o preprocessing.o
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 translation.o: translation.cpp translation.h
@@ -13,6 +13,8 @@ translation.o: translation.cpp translation.h
 tokenizer.o: tokenizer.cpp tokenizer.h
 	$(CC) -c $(CFLAGS) $<
 
+preprocessing.o: preprocessing.cpp preprocessing.h
+	$(CC) -c $(CFLAGS) $<
 .PHONY: clean cleanest
 
 clean:

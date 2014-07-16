@@ -8,7 +8,15 @@ int main(int argc, char *argv[]) {
 	} else {
 		filename = "/Users/david/parprog-2/quicksort/common.c";
 	}
+	try {
 	return translate(filename);
+	} catch (IOException& error) {
+		cout << "Error relating to input/output: " << error.what() << "\n";
+		return 2;
+	} catch (runtime_error& error) {
+		cout << "Error: " << error.what() << "\n";
+		return 1;
+	}
 }
 int translate(string filename) {
 	ifstream filestream = ifstream(filename);
@@ -25,11 +33,13 @@ int translate(string filename) {
 	 * object-orientation. First, turn stream2to3 into a Source<char>
 	 * via StreamSource<char>
 	 */
-	StreamSource<char>* lexSource = new StreamSource<char>(stream2to3);
+	StreamSource<char>* lexSource = new StreamSource<char>(&stream2to3);
 	BufferedSource<char>* bufLexSource = new BufferedSource<char>(lexSource);
 	Lexer* lexer = new Lexer(bufLexSource); 
+	lexer->empty();
+	Preprocessor* preprocessor = new Preprocessor(filename);
 	while (true) {
-		PPToken token = lexer->get();
+		PPToken token = preprocessor->get();
 		string current = token.getName();
 		//PPTokenKey key = token.getKey();
 		if (current.length() > 0)
@@ -37,12 +47,10 @@ int translate(string filename) {
 			//cout << current << ": " << key << '\n';
 			cout << current;
 		}
-		if (lexer->empty())
+		if (preprocessor->empty())
 		{
 			break;
 		}
-		bufLexSource->trim(1);
-		bufLexSource->reset();
 	}
 	return 0;
 }
@@ -160,14 +168,6 @@ PPToken Lexer :: get() {
 		str = testStr;
 	}
 	this->bufSource->reset();
-	//Match header name
-	//Only to be done within an '#include', should be changed?
-	/*testStr = matchHeaderName(bufSource);
-	if (testStr.length() > str.length()) {
-		key = HEADERNAME;
-		str = testStr;
-	}
-	this->bufSource->reset();*/
 
 	//Match other
 	if (str.length() == 0)
@@ -183,7 +183,7 @@ PPToken Lexer :: get() {
 }
 
 string matchComment(Source<char>* source) {
-	string out = "";
+	string name = "";
 	char current = source->get();
 	if (current == '/') {
 		current = source->get();
@@ -201,50 +201,49 @@ string matchComment(Source<char>* source) {
 }
 
 string matchIdentifier(Source<char>* source) {
-	string out = "";
+	string name = "";
 	char current = source->get();
 	if (isalpha(current) || current == '_')
 	{
-		out += current;
+		name += current;
 		current = source->get();
 		while (isalnum(current) || current == '_')
 		{
-			out += current;
+			name += current;
 			current = source->get();
 		}
 	}
-	return out;
+	return name;
 }
 
 bool isBaseChar(char c) {
 	return (isspace(c) || (isprint(c) && c != '$' && c != '@'));
 }
 
-string matchHeaderName(Source<char>* source) {
-	string out = "";
-	char current = source->get();
+PPToken Lexer :: matchHeaderName() {
+	string name = "";
+	char current = bufSource->get();
 	if (current == '<' || current == '\"')
 	{
 		char end = '>';
 		if (current == '\"') {
 			end = '\"';
 		}
-		out += current;
-		current = source->get();
+		name += current;
+		current = bufSource->get();
 		while (isBaseChar(current) && current != '\n' && current != end) {
-			out += current;
-			current = source->get();
+			name += current;
+			current = bufSource->get();
 		}
 		if (current == end) {
-			out += current;
-			source->get();
-			return out;
+			name += current;
+			bufSource->get();
+			return PPToken(0, 0, name, HEADERNAME);
 		} else {
-			return "";
+			return PPToken(0, 0, "", OTHER);
 		}
 	} else {
-		//out += current; //Remove after bugtesting
-		return out;
+		return PPToken(0, 0, name, HEADERNAME);
 	}
-	return out;
+	return PPToken(0, 0, name, HEADERNAME);
 }
