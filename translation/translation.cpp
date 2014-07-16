@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		filename = argv[1];
 	} else {
-		filename = "/Users/david/parprog-2/quicksort/common.c";
+		filename = "/Users/David/toycc/test/include.c";
 	}
 	try {
 	return translate(filename);
@@ -172,8 +172,13 @@ PPToken Lexer :: get() {
 	//Match other
 	if (str.length() == 0)
 	{
-		str += bufSource->get();
-		key = OTHER;
+		char c = bufSource->get();
+		str += c;
+		if (iswspace(c)) {
+			key = WHITESPACE;
+		} else {
+			key = OTHER;
+		}
 		bufSource->get();
 	}
 	bufSource->reset();
