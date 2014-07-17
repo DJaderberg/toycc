@@ -8,18 +8,6 @@
 using namespace std;
 
 
-class Position {
-	public:
-		Position() : line(0), column(0) {}
-		Position(unsigned int l, unsigned int c) : line(l), column(c) {}
-		unsigned int getLine() {return line;}
-		unsigned int getColumn() {return column;}
-		void setLine(unsigned int input) {line = input;}
-		void setColumn(unsigned int input) {column = input;}
-	private:
-		unsigned int line;
-		unsigned int column;
-};
 /*! The source class represents a source of the type,
  * e.g. a stream such as istream.
  */
@@ -31,6 +19,8 @@ class Source
 		virtual bool empty() = 0; //True if source has no more items
 		virtual ~Source() {}
 		Position getPosition() {return this->position;}
+		void newLine() {position.setLine(position.getLine() + 1);
+			position.setColumn(1);}
 		void incrementPosition(unsigned int line, unsigned int column)
 		{
 			this->position.setLine(line+this->position.getLine());
@@ -140,6 +130,7 @@ class Preprocessor : public Phase<char, PPToken> {
 		BufferedSource<char>* bufLexSource;
 		bool usingCache;
 		Preprocessor* cache;
+		PPToken include();
 };
 
 //! A type of exception relating input/output operations

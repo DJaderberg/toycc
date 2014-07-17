@@ -8,18 +8,34 @@ inline int is_name_first(char ch);
 inline int is_name(char ch);
 inline int is_number(char ch);
 
+
+class Position {
+	public:
+		Position() : line(0), column(0) {}
+		Position(unsigned int l, unsigned int c) : line(l), column(c) {}
+		unsigned int getLine() {return line;}
+		unsigned int getColumn() {return column;}
+		void setLine(unsigned int input) {line = input;}
+		void setColumn(unsigned int input) {column = input;}
+	private:
+		unsigned int line;
+		unsigned int column;
+};
+
+
 //! A token, i.e. a character or a word
 class Token {
 	public:
 		Token(unsigned int line = 0, unsigned int column = 0, \
-				string name = ""): line(line), column(column), name(name) {};
-		unsigned int getLine() {return line;}
-		unsigned int getColumn() {return column;}
+				string name = ""): name(name) {
+		this->position = *new Position(line, column);}
+		Token(Position pos, string name = "") : position(pos), name(name) {}
+		unsigned int getLine() {return position.getLine();}
+		unsigned int getColumn() {return position.getColumn();}
 		string getName() {return name;}
 		void setName(string name) {this->name = name;} 
 	private:
-		unsigned int line;
-		unsigned int column;
+		Position position;
 		string name;
 };
 
@@ -32,6 +48,8 @@ class PPToken : public Token {
 		PPToken(unsigned int line = 0, unsigned int column = 0, \
 				string name = "", PPTokenKey id = IDENTIFIER) : \
 			Token(line, column, name), id(id) {}
+		PPToken(Position pos, string name = "", PPTokenKey id = IDENTIFIER) : \
+			Token(pos, name), id(id) {}
 		PPTokenKey getKey() {return id;};
 	private:
 		PPTokenKey id;
