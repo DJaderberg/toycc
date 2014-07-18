@@ -4,6 +4,7 @@
 #include <sstream>
 #include <deque>
 #include <list>
+#include <map>
 #include "tokenizer.h"
 
 using namespace std;
@@ -152,9 +153,12 @@ class Preprocessor : public Phase<char, PPToken> {
 		BufferedSource<char>* bufLexSource;
 		bool usingCache;
 		Preprocessor* cache;
+		bool expandingMacro;
+		list<PPToken> macroCache;
 		map<string, Macro*> macroMap;
 		PPToken include();
 		PPToken define();
+		PPToken unexpandedGet(); //A get function that does not expand macros
 		
 };
 
