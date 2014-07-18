@@ -153,7 +153,8 @@ PPToken Lexer :: get() {
 	string str = "";
 	string testStr = "";
 	//Waste comments
-	testStr = matchComment(bufSource);
+	PPToken testToken = this->matchComment();
+	testStr = testToken.getName();
 	if (testStr.length() > 0) {
 		key = OTHER;
 		PPToken ppt= PPToken(0, 0, " ", key);
@@ -162,7 +163,8 @@ PPToken Lexer :: get() {
 	this->bufSource->reset();
 
 	//Match identifier
-	testStr = matchIdentifier(bufSource);
+	testToken = this->matchIdentifier();
+	testStr = testToken.getName();
 	if (testStr.length() > str.length()) {
 		key = IDENTIFIER;
 		str = testStr;
@@ -182,43 +184,43 @@ PPToken Lexer :: get() {
 		bufSource->get();
 	}
 	bufSource->reset();
-	PPToken pptoken = PPToken(0, 0,str, key);
+	PPToken pptoken = PPToken(this->getPosition(), str, key);
 	return pptoken;
 
 }
 
-string matchComment(Source<char>* source) {
+PPToken Lexer :: matchComment() {
 	string name = "";
-	char current = source->get();
+	char current = bufSource->get();
 	if (current == '/') {
-		current = source->get();
+		current =bufSource->get();
 		if (current == '/') {
-			while (source->get() != '\n') ;
-			source->get();
-			return " ";
+			while (bufSource->get() != '\n') ;
+			bufSource->get();
+			return PPToken(this->getPosition(), " ", WHITESPACE);
 		} else if (current == '*') {
-			while (!(source->get() == '*' && source->get() == '/')) ;
-			source->get();
-			return " ";
+			while (!(bufSource->get() == '*' && bufSource->get() == '/')) ;
+			bufSource->get();
+			return PPToken(this->getPosition(), " ", WHITESPACE);
 		}
 	}
-	return "";
+	return PPToken(this->getPosition(), "", WHITESPACE);
 }
 
-string matchIdentifier(Source<char>* source) {
+PPToken Lexer :: matchIdentifier() {
 	string name = "";
-	char current = source->get();
+	char current = bufSource->get();
 	if (isalpha(current) || current == '_')
 	{
 		name += current;
-		current = source->get();
+		current = bufSource->get();
 		while (isalnum(current) || current == '_')
 		{
 			name += current;
-			current = source->get();
+			current = bufSource->get();
 		}
 	}
-	return name;
+	return PPToken(this->getPosition(), name, IDENTIFIER);
 }
 
 bool isBaseChar(char c) {

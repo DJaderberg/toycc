@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <deque>
+#include <list>
 #include "tokenizer.h"
 
 using namespace std;
@@ -100,8 +101,29 @@ class Lexer : public Phase<char, PPToken> {
 		PPToken get();
 		bool empty() {return bufSource->empty();}
 		PPToken matchHeaderName();
+		PPToken matchComment();
+		PPToken matchIdentifier();
 	private:
 		BufferedSource<char>* bufSource;
+};
+
+class Macro {
+	public:
+		Macro(const string name, list<PPToken>& list) : name(name), body(list) {}
+		~Macro() { }
+		virtual list<PPToken> expand() = 0;
+	protected:
+		const string getName() {return this->name;}
+		const list<PPToken>& getBody() {return this->body;}
+	private:
+		const string name;
+		const list<PPToken>& body;
+};
+
+class ObjectMacro : public Macro {
+	public:
+		ObjectMacro(const string name, list<PPToken>& list) : Macro(name, list) {}
+		list<PPToken> expand() {return list<PPToken>(this->getBody());}
 };
 
 
@@ -130,7 +152,10 @@ class Preprocessor : public Phase<char, PPToken> {
 		BufferedSource<char>* bufLexSource;
 		bool usingCache;
 		Preprocessor* cache;
+		map<string, Macro*> macroMap;
 		PPToken include();
+		PPToken define();
+		
 };
 
 //! A type of exception relating input/output operations
