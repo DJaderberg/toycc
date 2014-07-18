@@ -20,14 +20,15 @@ Preprocessor :: Preprocessor(string filename) : Phase(filename) {
 	this->lexer = new Lexer(bufLexSource);
 	this->usingCache = false;
 	this->expandingMacro = false;
+	this->macroMap = new map<string, Macro*>();
 }
 
 PPToken Preprocessor :: get() {
 	if (this->expandingMacro) {
-		if (!this->macroCache.empty()) {
-			PPToken ret = this->macroCache.front();
-			this->macroCache.pop_front();
-			if (this->macroCache.empty() ){
+		if (!this->macroCache->empty()) {
+			PPToken ret = this->macroCache->front();
+			this->macroCache->pop_front();
+			if (this->macroCache->empty() ){
 					this->expandingMacro = false;
 			}
 			return ret;
@@ -38,10 +39,10 @@ PPToken Preprocessor :: get() {
 	}
 	PPToken token = this->unexpandedGet();
 	if (token.getKey() == IDENTIFIER) {
-		auto search = this->macroMap.find(token.getName());
-		if (search != this->macroMap.end()) {
+		auto search = this->macroMap->find(token.getName());
+		if (search != this->macroMap->end()) {
 			//Found something, start returning expanded version
-			this->macroCache = search->second->expand();
+			this->macroCache = new list<PPToken>(search->second->expand());
 			this->expandingMacro = true;
 			return this->get();
 		}
@@ -82,21 +83,33 @@ PPToken Preprocessor :: unexpandedGet() {
 
 PPToken Preprocessor :: define() {
 	PPToken token = lexer->get();
+	bufLexSource->trim(1);
+	bufLexSource->reset();
+	while (token.getKey() == WHITESPACE && token.getName() != "\n") {
+		token = lexer->get();
+		bufLexSource->clear();
+	}
 	if (token.getKey() == IDENTIFIER) {
 		//We have a macro, start setting up for adding it to the macroMap
 		string macroName = token.getName();
 		PPToken current = lexer->get();
-		list<PPToken> body = list<PPToken>();
+		list<PPToken>* body = new list<PPToken>();
 		if (current.getName() == "(") {
 			//Function macro
 
 		} else {
 			//Object macro
+			bufLexSource->trim(1);
+			bufLexSource->reset();
 			while (current.getName() != "\n") {
-				body.push_back(current);
+				body->push_back(current);
+				current = lexer->get();
+				bufLexSource->trim(1);
+				bufLexSource->reset();
 			}
-			ObjectMacro* macro = new ObjectMacro(macroName, body);
-			this->macroMap[macroName] = macro;
+			ObjectMacro* macro = new ObjectMacro(macroName, *body);
+			(*this->macroMap)[macroName] = macro;
+			return current;
 		}
 	}
 	return token;
