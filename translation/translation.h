@@ -131,7 +131,8 @@ class FunctionMacro : public Macro {
 	public:
 		FunctionMacro(const string name, list<PPToken>& l,\
 			   	list<PPToken>& arg_names) : Macro(name, l),\
-										   	arguments(arg_names), bindable(arg_names) {
+										   	arguments(arg_names),\
+											bindable(*new list<PPToken>(arg_names))	{
 											argMap = map<string, list<PPToken>*>();
 											}
 		bool bind(list<PPToken>* replacement) {

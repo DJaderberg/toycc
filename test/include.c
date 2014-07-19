@@ -8,6 +8,8 @@ int main() {
 	int local = 2 multiply GLOBAL;	
 	int A = 3, B = 7;
 	int maximum = MAX(A,B);
+	MAX(Gurka , Banan3);
+	MAX(A,B);
 	return local+maximum;
 }
 
