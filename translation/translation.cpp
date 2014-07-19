@@ -254,3 +254,15 @@ PPToken Lexer :: matchHeaderName() {
 	}
 	return PPToken(0, 0, name, HEADERNAME);
 }
+
+bool FunctionMacro :: bind(string key, list<PPToken>* replacement) {
+	auto search = this->argMap.find(key);
+	if (search ==  this->argMap.end()) {
+		//Couldn't bind, since the key wasn't found
+		return false;
+	} else {
+		this->argMap[key] = replacement;
+		return true;
+	}
+}
+

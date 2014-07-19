@@ -123,8 +123,25 @@ class Macro {
 
 class ObjectMacro : public Macro {
 	public:
-		ObjectMacro(const string name, list<PPToken>& list) : Macro(name, list) {}
+		ObjectMacro(const string name, list<PPToken>& l) : Macro(name, l) {}
 		list<PPToken> expand() {return list<PPToken>(this->getBody());}
+};
+
+class FunctionMacro : public Macro {
+	public:
+		FunctionMacro(const string name, list<PPToken>& l,\
+			   	list<PPToken>& arg_names) : Macro(name, l),\
+										   	arguments(arg_names) {
+											argMap = map<string, list<PPToken>*>();
+											}
+		bool bind(PPToken key, list<PPToken>* replacement) {
+			return this->bind(key.getName(), replacement);
+		}
+		bool bind(string key, list<PPToken>* replacement);
+		list<PPToken> expand();
+	private:
+		list<PPToken>& arguments;
+		map<string, list<PPToken>*> argMap;
 };
 
 
