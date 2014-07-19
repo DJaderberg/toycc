@@ -13,10 +13,12 @@ int main(int argc, char *argv[]) {
 	} catch (IOException& error) {
 		cout << "Error relating to input/output: " << error.what() << "\n";
 		return 2;
+	} catch (SyntaxException& error) {
+		cout << "Syntax error: " << error.what() << "\n";
 	} catch (runtime_error& error) {
 		cout << "Error: " << error.what() << "\n";
 		return 1;
-	}
+	} 
 }
 int translate(string filename) {
 	ifstream filestream = ifstream(filename);
@@ -258,11 +260,32 @@ PPToken Lexer :: matchHeaderName() {
 bool FunctionMacro :: bind(string key, list<PPToken>* replacement) {
 	auto search = this->argMap.find(key);
 	if (search ==  this->argMap.end()) {
-		//Couldn't bind, since the key wasn't found
-		return false;
-	} else {
+		//Can bind since the key wasn't found
 		this->argMap[key] = replacement;
 		return true;
+	} else {
+		return false;
 	}
+}
+
+list<PPToken> FunctionMacro :: expand() {
+	list <PPToken> returnList = list<PPToken>();
+	for (const PPToken& c : this->getBody()) {
+		PPToken current = PPToken(c);
+		auto argSearch = argMap.find(current.getName());
+		if (argSearch == this->argMap.end()) {
+			//Since it's not an argument, just put in the current token
+			returnList.push_back(current);
+		} else {
+			//Put in the replacements for the current argument
+			for (PPToken p : *argSearch->second) {
+				returnList.push_back(p);
+			}	
+		}
+	}
+	//Bookkeeping, clear all bound variables
+	this->bindable = list<PPToken>(this->arguments);
+	this->argMap.clear();
+	return returnList;
 }
 

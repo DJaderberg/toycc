@@ -41,6 +41,51 @@ PPToken Preprocessor :: get() {
 	if (token.getKey() == IDENTIFIER) {
 		auto search = this->macroMap->find(token.getName());
 		if (search != this->macroMap->end()) {
+			//Do dynamic down-cast to FunctionMacro if possible and expect function-like 
+			//macro whenever it works
+			if (FunctionMacro* fm = dynamic_cast<FunctionMacro*>(search->second)) {
+				token = this->unexpandedGet();
+				if (token.getName() != "(") {
+					string err = "Expected '(' after invocation of function-like macro ";
+					err += search->first;
+					throw SyntaxException(err);
+				} else {
+					unsigned int parenDepth = 1; //Keep track of how many layers of 
+					//parenthesis deep we curently are
+					list<PPToken>* currentList = new list<PPToken>();
+					token = this->unexpandedGet();
+					while (parenDepth > 0) {
+						if (token.getName() == ")") {
+							--parenDepth;
+							if (parenDepth == 0) {
+								break;
+							}
+						} else if (token.getName() == "(") {
+							++parenDepth;
+						} else if (token.getName() == "," && parenDepth == 1) {
+							if (!fm->bind(currentList)) {
+								string err = "Could not bind argument to function-like"\
+											  " macro";
+								throw SyntaxException(err);
+							}
+							currentList = new list<PPToken>();
+						} else if (token.getName() == "\n" && parenDepth != 0) {
+							string err = "Expected ')' before new line";
+							throw SyntaxException(err);
+						} else {
+							currentList->push_back(token);
+						}
+						token = this->unexpandedGet();
+					}
+					//Do not check for errors here, as it might be a 0 argument macro
+					fm->bind(currentList);
+					this->macroCache = new list<PPToken>(fm->expand());
+					this->expandingMacro = true;
+					this->bufLexSource->trim(1);
+					this->bufLexSource->reset();
+					return PPToken(this->getPosition(), "", WHITESPACE);
+				}
+			}
 			//Found something, start returning expanded version
 			this->macroCache = new list<PPToken>(search->second->expand());
 			this->expandingMacro = true;
@@ -87,7 +132,8 @@ PPToken Preprocessor :: define() {
 	bufLexSource->reset();
 	while (token.getKey() == WHITESPACE && token.getName() != "\n") {
 		token = lexer->get();
-		bufLexSource->clear();
+		bufLexSource->trim(1);
+		bufLexSource->reset();
 	}
 	if (token.getKey() == IDENTIFIER) {
 		//We have a macro, start setting up for adding it to the macroMap
@@ -96,9 +142,55 @@ PPToken Preprocessor :: define() {
 		list<PPToken>* body = new list<PPToken>();
 		if (current.getName() == "(") {
 			//Function macro
-
+			bufLexSource->trim(1);
+			bufLexSource->reset();
+			list<PPToken>* args = new list<PPToken>();
+			current = lexer->get();
+			bufLexSource->trim(1);
+			bufLexSource->reset();
+			bool delimited = true;
+			while (current.getName() != "\n" || current.getName() != ")") {
+				if (current.getKey() == IDENTIFIER) {
+					args->push_back(current);
+					delimited = false;
+				} else if (current.getName() == ")") {
+					if (delimited) {
+						string err = "Expected name of an argument before closing "\
+									  "parenthesis in definition of function-like macro";
+						throw SyntaxException(err);
+					} else {
+						current = lexer->get();
+						break;
+					}
+				} else if (current.getName() == ",") {
+					if (delimited) {
+						string err = "Expected name of an argument in definition of "\
+									  "function-like macro";
+						throw SyntaxException(err);
+					} else {
+						delimited = true;
+					}
+				} else if (current.getName() == "\n") {
+					string err = "Expected end of list of arguments before new line in "\
+								  "declaration of function-like macro";
+				}
+				current = lexer->get();
+				bufLexSource->trim(1);
+				bufLexSource->reset();
+			}
+			list<PPToken>* body = new list<PPToken>();
+			while (current.getName() != "\n") {
+				body->push_back(current);
+				current = lexer->get();
+				bufLexSource->trim(1);
+				bufLexSource->reset();
+			}
+			FunctionMacro* macro = new FunctionMacro(macroName, *body, *args);
+			(*this->macroMap)[macroName] = macro;
+			return current;
 		} else {
 			//Object macro
+			current = lexer->get();
 			bufLexSource->trim(1);
 			bufLexSource->reset();
 			while (current.getName() != "\n") {

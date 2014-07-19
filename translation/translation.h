@@ -131,9 +131,17 @@ class FunctionMacro : public Macro {
 	public:
 		FunctionMacro(const string name, list<PPToken>& l,\
 			   	list<PPToken>& arg_names) : Macro(name, l),\
-										   	arguments(arg_names) {
+										   	arguments(arg_names), bindable(arg_names) {
 											argMap = map<string, list<PPToken>*>();
 											}
+		bool bind(list<PPToken>* replacement) {
+			if (bindable.empty()) {
+				return false;
+			}
+			PPToken bindTo = this->bindable.front();
+			bindable.pop_front();
+			return this->bind(bindTo.getName(), replacement);
+		}
 		bool bind(PPToken key, list<PPToken>* replacement) {
 			return this->bind(key.getName(), replacement);
 		}
@@ -141,6 +149,7 @@ class FunctionMacro : public Macro {
 		list<PPToken> expand();
 	private:
 		list<PPToken>& arguments;
+		list<PPToken>& bindable;
 		map<string, list<PPToken>*> argMap;
 };
 
@@ -184,6 +193,12 @@ class IOException : public runtime_error {
 	public:
 		IOException(string w) : runtime_error(w) {}
 		IOException(char* w) : runtime_error(w) {}
+};
+
+class SyntaxException : public runtime_error {
+	public:
+		SyntaxException(string w) : runtime_error(w) {}
+		SyntaxException(char* w) : runtime_error(w) {}
 };
 
 int translate(string filename);

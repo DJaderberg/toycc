@@ -33,7 +33,7 @@ class Token {
 		Token(Position pos, string name = "") : position(pos), name(name) {}
 		unsigned int getLine() {return position.getLine();}
 		unsigned int getColumn() {return position.getColumn();}
-		string const getName() {return name;}
+		const string getName() {return name;}
 	private:
 		Position position;
 		string name;
