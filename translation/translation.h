@@ -185,6 +185,7 @@ class Preprocessor : public Phase<char, PPToken> {
 		map<string, Macro*>* macroMap;
 		PPToken include();
 		PPToken define();
+		PPToken undef();
 		PPToken unexpandedGet(); //A get function that does not expand macros
 		
 };

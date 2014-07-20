@@ -10,6 +10,9 @@ int main() {
 	int maximum = MAX(A,B);
 	MAX(Gurka , Banan3);
 	MAX(A,B);
+
+#undef MAX
+	MAX(5,7);
 	return local+maximum;
 }
 

@@ -77,7 +77,8 @@ PPToken Preprocessor :: get() {
 						}
 						token = this->unexpandedGet();
 					}
-					//Do not check for errors here, as it might be a 0 argument macro
+					//Do not check for errors here, as it might be 
+					//a 0 argument macro
 					fm->bind(currentList);
 					this->macroCache = new list<PPToken>(fm->expand());
 					this->expandingMacro = true;
@@ -118,6 +119,8 @@ PPToken Preprocessor :: unexpandedGet() {
 			return this->include();	
 		} else if (current.getName() == "define") {
 			return this->define();
+		} else if (current.getName() == "undef") {
+			return this->undef();
 		}
 	}
 	
@@ -249,3 +252,25 @@ PPToken Preprocessor :: include() {
 	}
 	return PPToken(this->getPosition(), "", OTHER);
 }
+
+PPToken Preprocessor :: undef() {
+	PPToken current = lexer->get();
+	while (current.getKey() == WHITESPACE && current.getName() != "\n") {
+		current = lexer->get();
+		bufLexSource->trim(1);
+		bufLexSource->reset();
+	}
+	if (current.getName() == "\n") {
+		string err = "Expected macro name to undef before new line";
+		throw SyntaxException(err);
+	} else if (current.getKey() != IDENTIFIER) {
+		string err = "Expected identifier to apply undef to";
+		throw SyntaxException(err);
+	} else {
+		macroMap->erase(current.getName());
+	}
+	bufLexSource->trim(1);
+	bufLexSource->reset();
+	return lexer->get();
+}
+
