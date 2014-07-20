@@ -23,36 +23,35 @@ class Position {
 		unsigned int column;
 };
 
+enum TokenKey { OTHER,  HEADERNAME, IDENTIFIER, PPNUMBER, CHARACTERCONSTANT, \
+   STRINGLITERAL, PUNCTUATOR, WHITESPACE, KEYWORD, CONSTANT}; 
 
-//! A token, i.e. a character or a word
+//! A token, i.e. a character or a word or some such
 class Token {
 	public:
 		Token(unsigned int line = 0, unsigned int column = 0, \
-				string name = ""): name(name) {
-		this->position = *new Position(line, column);}
-		Token(Position pos, string name = "") : position(pos), name(name) {}
+				string name = "", TokenKey id = IDENTIFIER) : \
+			Token(Position(line, column), name, id) {}
+		Token(Position pos, string name = "", TokenKey id = IDENTIFIER)\
+										   : position(pos), name(name), id(id) {}
 		unsigned int getLine() {return position.getLine();}
 		unsigned int getColumn() {return position.getColumn();}
 		const string getName() {return name;}
+		TokenKey getKey() {return id;};
 	private:
 		Position position;
 		string name;
+		TokenKey id;
 };
-
-enum PPTokenKey { OTHER,  HEADERNAME, IDENTIFIER, PPNUMBER, CHARACTERCONSTANT, \
-   STRINGLITERAL, PUNCTUATOR, WHITESPACE}; 
 
 //! A preprocessing token used in phases 3 to 7
 class PPToken : public Token {
 	public:
 		PPToken(unsigned int line = 0, unsigned int column = 0, \
-				string name = "", PPTokenKey id = IDENTIFIER) : \
-			Token(line, column, name), id(id) {}
-		PPToken(Position pos, string name = "", PPTokenKey id = IDENTIFIER) : \
-			Token(pos, name), id(id) {}
-		PPTokenKey getKey() {return id;};
-	private:
-		PPTokenKey id;
+				string name = "", TokenKey id = IDENTIFIER) : \
+			Token(line, column, name, id) {}
+		PPToken(Position pos, string name = "", TokenKey id = IDENTIFIER) : \
+			Token(pos, name,id) {}
 };
 
 //! A class holding a stream, which can hand back tokens from the stream

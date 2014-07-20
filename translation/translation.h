@@ -59,6 +59,7 @@ class BufferedSource : public Source<T> {
 				this->used = 0;
 			}
 		T get();
+		T peek();
 		void reset() {used = 0;} //Move stream back to beginning of buffer
 		void clear() {
 			this->trim(0);
@@ -92,6 +93,7 @@ class Phase : public Source<To>, public Mapping<From, To> {
 	public:
 		Phase(string filename) : source(*new StreamSource<From>(filename)) {}
 		Phase(Source<From> *s) : source(*s) {}
+		Phase(Source<From>& s) : source(s) {}
 		Source<From>& source;
 };
 
@@ -188,6 +190,12 @@ class Preprocessor : public Phase<char, PPToken> {
 		PPToken undef();
 		PPToken unexpandedGet(); //A get function that does not expand macros
 		
+};
+
+class postPPTokenzier : Phase<PPToken, PPToken> {
+	public:
+		postPPTokenzier(BufferedSource<PPToken>& source) : Phase(source) {}
+		PPToken get();
 };
 
 //! A type of exception relating input/output operations

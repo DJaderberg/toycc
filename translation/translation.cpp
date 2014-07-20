@@ -43,7 +43,7 @@ int translate(string filename) {
 	while (true) {
 		PPToken token = preprocessor->get();
 		string current = token.getName();
-		//PPTokenKey key = token.getKey();
+		//TokenKey key = token.getKey();
 		if (current.length() > 0)
 		{
 			//cout << current << ": " << key << '\n';
@@ -150,8 +150,16 @@ T BufferedSource<T> :: get() {
 	}
 }
 
+template <class T>
+T BufferedSource<T> :: peek() {
+	unsigned int temp_used = this->used;
+	T val = this->get();
+	this->used = temp_used; //Do not 'use' the element
+	return val;
+}
+
 PPToken Lexer :: get() {
-	PPTokenKey key = OTHER;
+	TokenKey key = OTHER;
 	string str = "";
 	string testStr = "";
 	//Waste comments
