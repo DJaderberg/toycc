@@ -54,6 +54,19 @@ class PPToken : public Token {
 			Token(pos, name,id) {}
 };
 
+class PPTokenInternal : public PPToken {
+	public:
+		PPTokenInternal(unsigned int line = 0, unsigned int column = 0, \
+				string name = "", TokenKey id = IDENTIFIER, \
+				unsigned int used = 1) : \
+			PPToken(line, column, name, id), used(used) {}
+		PPTokenInternal(Position pos, string name = "", TokenKey id = IDENTIFIER,\
+				unsigned int used = 1)  : PPToken(pos, name,id), used(used) {}
+		unsigned int getUsed() {return used;}
+	private:
+		unsigned int used; //Tells how many of the input were used to create this
+};
+
 //! A class holding a stream, which can hand back tokens from the stream
 class Tokenizer {
 	public:

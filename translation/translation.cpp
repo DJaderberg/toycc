@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	} 
 }
+
 int translate(string filename) {
 	ifstream filestream = ifstream(filename);
 	stringstream stream1to2 = stringstream(std::ios_base::in
@@ -156,6 +157,19 @@ T BufferedSource<T> :: peek() {
 	T val = this->get();
 	this->used = temp_used; //Do not 'use' the element
 	return val;
+}
+
+//Look ahead as many elements as given in the argument.
+//@param ahead How many elements to look ahead. 0 (zero) is the same as peek().
+template <class T>
+T BufferedSource<T> :: peek(unsigned int ahead) {
+	unsigned int old_used = this->used;
+	T token = this->get();
+	for (int i = ahead; i > 0; --i) {
+		token = this->get();
+	}
+	this->used = old_used; //Restore the number of used items
+	return token;
 }
 
 PPToken Lexer :: get() {
@@ -295,5 +309,82 @@ list<PPToken> FunctionMacro :: expand() {
 	this->bindable = list<PPToken>(this->arguments);
 	this->argMap.clear();
 	return returnList;
+}
+
+Token PostPPTokenzier :: get() {
+	string longest = "";
+	string testStr = "";
+	PPTokenInternal testToken;
+	PPTokenInternal returnToken;
+	
+	testToken = this->matchKeyword();
+	testStr = testToken.getName();
+	if (testStr > longest) {
+		longest = testStr;
+	}
+	return Token (returnToken); //Type-cast to Token and return that
+}
+
+PPTokenInternal PostPPTokenzier :: matchKeyword() {
+	unsigned int used = 1;
+	PPToken token = source.peek();
+	string str = token.getName();
+	if (str == "_") {
+		str += source.peek(1).getName();
+		used = 2;
+	}
+	auto search = this->keywordMap.find(str);
+	if (search != this->keywordMap.end()) {
+		return PPTokenInternal(source.getPosition(), str, KEYWORD, used);
+	}
+	return PPTokenInternal(source.getPosition(), str, OTHER, 0);
+}
+
+void PostPPTokenzier :: initKeywordMap() {
+	this->keywordMap["auto"] = "auto";
+	this->keywordMap["a"] = "a";
+	this->keywordMap["q"] = "q";
+	this->keywordMap["break"] = "break";
+	this->keywordMap["case"] = "case";
+	this->keywordMap["const"] = "const";
+	this->keywordMap["continue"] = "continue";
+	this->keywordMap["default"] = "default";
+	this->keywordMap["do"] = "do";
+	this->keywordMap["double"] = "double";
+	this->keywordMap["else"] = "else";
+	this->keywordMap["enum"] = "enum";
+	this->keywordMap["extern"] = "extern";
+	this->keywordMap["float"] = "float";
+	this->keywordMap["for"] = "for";
+	this->keywordMap["goto"] = "goto";
+	this->keywordMap["if"] = "if";
+	this->keywordMap["inline"] = "inline";
+	this->keywordMap["int"] = "int";
+	this->keywordMap["long"] = "long";
+	this->keywordMap["register"] = "register";
+	this->keywordMap["restrict"] = "restrict";
+	this->keywordMap["return"] = "return";
+	this->keywordMap["short"] = "short";
+	this->keywordMap["signed"] = "signed";
+	this->keywordMap["sizeof"] = "sizeof";
+	this->keywordMap["static"] = "static";
+	this->keywordMap["struct"] = "struct";
+	this->keywordMap["switch"] = "switch";
+	this->keywordMap["typedef"] = "typedef";
+	this->keywordMap["union"] = "union";
+	this->keywordMap["unsigned"] = "unsigned";
+	this->keywordMap["void"] = "void";
+	this->keywordMap["volatile"] = "volatile";
+	this->keywordMap["while"] = "while";
+	this->keywordMap["_Alignas"] = "_Alignas";
+	this->keywordMap["_Alignof"] = "_Alignof";
+	this->keywordMap["_Atomic"] = "_Atomic";
+	this->keywordMap["_Bool"] = "_Bool";
+	this->keywordMap["_Complex"] = "_Complex";
+	this->keywordMap["_Generic"] = "_Generic";
+	this->keywordMap["_Imaginary"] = "_Imaginary";
+	this->keywordMap["_Noreturn"] = "_Noreturn";
+	this->keywordMap["_Static_assert"] = "_Static_assert";
+	this->keywordMap["_Thread_local"] = "_Thread_local";
 }
 

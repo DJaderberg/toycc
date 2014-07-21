@@ -60,6 +60,7 @@ class BufferedSource : public Source<T> {
 			}
 		T get();
 		T peek();
+		T peek(unsigned int ahead);
 		void reset() {used = 0;} //Move stream back to beginning of buffer
 		void clear() {
 			this->trim(0);
@@ -94,11 +95,12 @@ class Phase : public Source<To>, public Mapping<From, To> {
 		Phase(string filename) : source(*new StreamSource<From>(filename)) {}
 		Phase(Source<From> *s) : source(*s) {}
 		Phase(Source<From>& s) : source(s) {}
+		//Phase(BufferedSource<From>& s) : source(s) {}
 		Source<From>& source;
 };
 
 //! A lexer performs translation phase 3
-class Lexer : public Phase<char, PPToken> {	
+class Lexer : public Phase<char, PPToken> {
 	public:
 		Lexer(BufferedSource<char>* s) : Phase(s), bufSource(s) {}
 		PPToken get();
@@ -192,10 +194,19 @@ class Preprocessor : public Phase<char, PPToken> {
 		
 };
 
-class postPPTokenzier : Phase<PPToken, PPToken> {
+class PostPPTokenzier : Phase<PPToken, Token> {
 	public:
-		postPPTokenzier(BufferedSource<PPToken>& source) : Phase(source) {}
-		PPToken get();
+		PostPPTokenzier(BufferedSource<PPToken>& source) : Phase(source), \
+														   source(source), \
+														   keywordMap\
+														   (map<string,string>()) {}
+		Token get();
+		bool empty() {return this->source.empty();}
+	private:
+		BufferedSource<PPToken>& source;
+		PPTokenInternal matchKeyword();
+		map<string, string> keywordMap;
+		void initKeywordMap(); //Fills the keywordMap with keywords
 };
 
 //! A type of exception relating input/output operations
