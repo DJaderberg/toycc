@@ -41,14 +41,17 @@ int translate(string filename) {
 	Lexer* lexer = new Lexer(bufLexSource); 
 	lexer->empty();
 	Preprocessor* preprocessor = new Preprocessor(filename);
+	BufferedSource<PPToken>* bufPPPSource = new BufferedSource<PPToken>\
+											(preprocessor);
+	PostPPTokenizer* pppTokenizer = new PostPPTokenizer(*bufPPPSource);
 	while (true) {
-		PPToken token = preprocessor->get();
+		Token token = pppTokenizer->get();
 		string current = token.getName();
-		//TokenKey key = token.getKey();
+		TokenKey key = token.getKey();
 		if (current.length() > 0)
 		{
-			//cout << current << ": " << key << '\n';
-			cout << current;
+			cout << current << ": " << key << '\n';
+			//cout << current;
 		}
 		if (preprocessor->empty())
 		{
@@ -170,6 +173,14 @@ T BufferedSource<T> :: peek(unsigned int ahead) {
 	}
 	this->used = old_used; //Restore the number of used items
 	return token;
+}
+
+template <class T>
+void BufferedSource<T> :: clearUsed() {
+	for (unsigned int i = 0; i < this->used; ++i) {
+		this->que.pop_front();
+	}
+	this->used = 0;
 }
 
 PPToken Lexer :: get() {
@@ -311,7 +322,7 @@ list<PPToken> FunctionMacro :: expand() {
 	return returnList;
 }
 
-Token PostPPTokenzier :: get() {
+Token PostPPTokenizer :: get() {
 	string longest = "";
 	string testStr = "";
 	PPTokenInternal testToken;
@@ -321,11 +332,29 @@ Token PostPPTokenzier :: get() {
 	testStr = testToken.getName();
 	if (testStr > longest) {
 		longest = testStr;
+		returnToken = testToken;
 	}
+	testToken = this->matchPunctuator();
+	testStr = testToken.getName();
+	if (testStr > longest) {
+		longest = testStr;
+		returnToken = testToken;
+	}
+
+	//If no match
+	if(longest == "") {
+		Token token = Token (this->source.get());
+		this->source.clearUsed();
+		return token;
+	}
+	for (unsigned int i = 0; i < returnToken.getUsed(); ++i) {
+		this->source.get();
+	}
+	this->source.clearUsed();
 	return Token (returnToken); //Type-cast to Token and return that
 }
 
-PPTokenInternal PostPPTokenzier :: matchKeyword() {
+PPTokenInternal PostPPTokenizer :: matchKeyword() {
 	unsigned int used = 1;
 	PPToken token = source.peek();
 	string str = token.getName();
@@ -337,13 +366,96 @@ PPTokenInternal PostPPTokenzier :: matchKeyword() {
 	if (search != this->keywordMap.end()) {
 		return PPTokenInternal(source.getPosition(), str, KEYWORD, used);
 	}
-	return PPTokenInternal(source.getPosition(), str, OTHER, 0);
+	return PPTokenInternal(source.getPosition(), "", OTHER, 0);
 }
 
-void PostPPTokenzier :: initKeywordMap() {
+PPTokenInternal PostPPTokenizer :: matchPunctuator() {
+	unsigned int used = 1;
+	unsigned int i = 0;
+	bool matched = false;
+	PPToken token;
+	PPTokenInternal returnToken = PPTokenInternal(this->getPosition(), "", \
+			OTHER, 0);
+	string str = "";
+	for (i = 0; i < 4; ++i) {
+		token = source.peek(i);
+		str += token.getName();
+		if (str.length() > 4) break;
+		auto search = this->punctuatorMap.find(str);
+		if (search != this->punctuatorMap.end()) {
+			matched = true;
+			returnToken = PPTokenInternal(this->getPosition(), str, \
+					PUNCTUATOR, used+i);
+		}
+		
+	}
+	if (matched) {
+		return returnToken;
+	} else {
+		return PPTokenInternal(source.getPosition(), "", OTHER, 0);
+	}
+}
+
+void PostPPTokenizer :: initPunctuatorMap() {
+	this->punctuatorMap["q"] = "q";
+	this->punctuatorMap["["] = "[";
+	this->punctuatorMap["]"] = "]";
+	this->punctuatorMap["("] = "(";
+	this->punctuatorMap[")"] = ")";
+	this->punctuatorMap["{"] = "{";
+	this->punctuatorMap["}"] = "}";
+	this->punctuatorMap["."] = ".";
+	this->punctuatorMap["->"] = "->";
+	this->punctuatorMap["++"] = "++";
+	this->punctuatorMap["--"] = "--";
+	this->punctuatorMap["&"] = "&";
+	this->punctuatorMap["*"] = "*";
+	this->punctuatorMap["+"] = "+";
+	this->punctuatorMap["-"] = "-";
+	this->punctuatorMap["~"] = "~";
+	this->punctuatorMap["!"] = "!";
+	this->punctuatorMap["/"] = "/";
+	this->punctuatorMap["%"] = "%";
+	this->punctuatorMap["<<"] = "<<";
+	this->punctuatorMap[">>"] = ">>";
+	this->punctuatorMap["<"] = "<";
+	this->punctuatorMap[">"] = ">";
+	this->punctuatorMap["<="] = "<=";
+	this->punctuatorMap[">="] = ">=";
+	this->punctuatorMap["=="] = "==";
+	this->punctuatorMap["!="] = "!=";
+	this->punctuatorMap["^"] = "^";
+	this->punctuatorMap["|"] = "|";
+	this->punctuatorMap["&"] = "&";
+	this->punctuatorMap["||"] = "||";
+	this->punctuatorMap["?"] = "?";
+	this->punctuatorMap[":"] = ":";
+	this->punctuatorMap[";"] = ";";
+	this->punctuatorMap["..."] = "...";
+	this->punctuatorMap["="] = "=";
+	this->punctuatorMap["*="] = "*=";
+	this->punctuatorMap["/="] = "/=";
+	this->punctuatorMap["%="] = "%=";
+	this->punctuatorMap["+="] = "+=";
+	this->punctuatorMap["-="] = "-=";
+	this->punctuatorMap["<<="] = "<<=";
+	this->punctuatorMap[">>="] = ">>=";
+	this->punctuatorMap["&="] = "&=";
+	this->punctuatorMap["^="] = "^=";
+	this->punctuatorMap["|="] = "|=";
+	this->punctuatorMap[","] = ",";
+	this->punctuatorMap["#"] = "#";
+	this->punctuatorMap["##"] = "##";
+	this->punctuatorMap["<:"] = "<:";
+	this->punctuatorMap[":>"] = ":>";
+	this->punctuatorMap["<%"] = "<%";
+	this->punctuatorMap["%>"] = "%>";
+	this->punctuatorMap["%:"] = "%:";
+	this->punctuatorMap["%:%:"] = "%:%:";
+}
+
+void PostPPTokenizer :: initKeywordMap() {
 	this->keywordMap["auto"] = "auto";
-	this->keywordMap["a"] = "a";
-	this->keywordMap["q"] = "q";
 	this->keywordMap["break"] = "break";
 	this->keywordMap["case"] = "case";
 	this->keywordMap["const"] = "const";

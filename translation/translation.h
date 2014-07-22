@@ -66,6 +66,7 @@ class BufferedSource : public Source<T> {
 			this->trim(0);
 			this->reset();
 		}
+		void clearUsed();
 		void trim(unsigned int leave) {
 			while (que.size() > leave) {
 				que.pop_front();
@@ -194,19 +195,25 @@ class Preprocessor : public Phase<char, PPToken> {
 		
 };
 
-class PostPPTokenzier : Phase<PPToken, Token> {
+class PostPPTokenizer : Phase<PPToken, Token> {
 	public:
-		PostPPTokenzier(BufferedSource<PPToken>& source) : Phase(source), \
+		PostPPTokenizer(BufferedSource<PPToken>& source) : Phase(source), \
 														   source(source), \
 														   keywordMap\
-														   (map<string,string>()) {}
+														   (map<string,string>()) {
+															   initKeywordMap();
+															   initPunctuatorMap();
+														   }
 		Token get();
 		bool empty() {return this->source.empty();}
 	private:
 		BufferedSource<PPToken>& source;
 		PPTokenInternal matchKeyword();
+		PPTokenInternal matchPunctuator();
 		map<string, string> keywordMap;
 		void initKeywordMap(); //Fills the keywordMap with keywords
+		map<string, string> punctuatorMap;
+		void initPunctuatorMap();
 };
 
 //! A type of exception relating input/output operations
