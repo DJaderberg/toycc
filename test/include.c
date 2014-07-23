@@ -15,7 +15,8 @@ int main() {
 #undef MAX
 	MAX(5,7);
 	return local+maximum;
-	char* str = "I am a string literal\n";
+	char* str = "I am a string literal\n"\
+				 "Me too!\n""And me!\n";
 	char* chars = 'I am a char sequence';
 	15;
 	21.2;

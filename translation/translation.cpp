@@ -44,8 +44,12 @@ int translate(string filename) {
 	BufferedSource<PPToken>* bufPPPSource = new BufferedSource<PPToken>\
 											(preprocessor);
 	PostPPTokenizer* pppTokenizer = new PostPPTokenizer(*bufPPPSource);
+	WhiteSpaceCleaner* whitespacecleaner = new WhiteSpaceCleaner(*pppTokenizer);
+	BufferedSource<Token>* bufStrLitConCatSource = new BufferedSource<Token>\
+												   (whitespacecleaner);
+	StrLitConCat* strlitconcat = new StrLitConCat(*bufStrLitConCatSource);
 	while (true) {
-		Token token = pppTokenizer->get();
+		Token token = strlitconcat->get();
 		string current = token.getName();
 		TokenKey key = token.getKey();
 		if (current.length() > 0)
@@ -53,7 +57,7 @@ int translate(string filename) {
 			cout << current << ": " << key << '\n';
 			//cout << current;
 		}
-		if (preprocessor->empty())
+		if (strlitconcat->empty())
 		{
 			break;
 		}
@@ -631,5 +635,22 @@ void PostPPTokenizer :: initKeywordMap() {
 	this->keywordMap["_Noreturn"] = "_Noreturn";
 	this->keywordMap["_Static_assert"] = "_Static_assert";
 	this->keywordMap["_Thread_local"] = "_Thread_local";
+}
+
+Token StrLitConCat :: get() {
+	Token token = source.get();
+	if (token.getKey() == STRINGLITERAL) {
+		Token current = source.peek();
+		string str = token.getName();
+		while (current.getKey() == STRINGLITERAL) {
+			str.pop_back();
+			str += current.getName().substr(1, current.getName().length());
+			source.get();
+			current = source.peek();
+		}
+		return Token(this->getPosition(), str, STRINGLITERAL);
+	} else {
+		return token;
+	}
 }
 

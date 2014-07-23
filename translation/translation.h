@@ -196,7 +196,7 @@ class Preprocessor : public Phase<char, PPToken> {
 		
 };
 
-class PostPPTokenizer : Phase<PPToken, Token> {
+class PostPPTokenizer : public Phase<PPToken, Token> {
 	public:
 		PostPPTokenizer(BufferedSource<PPToken>& source) : Phase(source), \
 														   source(source), \
@@ -218,6 +218,32 @@ class PostPPTokenizer : Phase<PPToken, Token> {
 		void initKeywordMap(); //Fills the keywordMap with keywords
 		map<string, string> punctuatorMap;
 		void initPunctuatorMap();
+};
+
+class WhiteSpaceCleaner : public Phase<Token, Token> {
+	public:
+		WhiteSpaceCleaner(Source<Token>& source) : Phase(source) {}
+		bool empty() {return this->source.empty();}
+		Token get() {
+			Token current = source.get();
+			while (current.getKey() == WHITESPACE) {
+				current = source.get();
+				if (source.empty()) {
+					break;
+				}
+			}
+			return current;
+		}
+};
+
+class StrLitConCat : public Phase<Token, Token> {
+	public:
+		StrLitConCat(BufferedSource<Token>& source) : Phase(source), \
+													  source(source) {}
+		bool empty() {return this->source.empty();}
+		Token get();
+	private:
+		BufferedSource<Token>& source;
 };
 
 //! A type of exception relating input/output operations
