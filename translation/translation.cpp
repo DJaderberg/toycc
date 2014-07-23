@@ -384,6 +384,12 @@ Token PostPPTokenizer :: get() {
 		longest = testStr;
 		returnToken = testToken;
 	}
+	testToken = this->matchConstant();
+	testStr = testToken.getName();
+	if (testStr > longest) {
+		longest = testStr;
+		returnToken = testToken;
+	}
 	
 	//If no match
 	if(longest == "") {
@@ -396,6 +402,58 @@ Token PostPPTokenizer :: get() {
 	}
 	this->source.clearUsed();
 	return Token (returnToken); //Type-cast to Token and return that
+}
+
+PPTokenInternal PostPPTokenizer :: matchConstant() {
+	PPToken token = source.peek();
+	if (token.getKey() == PPNUMBER) {
+		return PPTokenInternal(this->getPosition(), token.getName(), CONSTANT,\
+				1);
+	}
+	string longest = "";
+	string testStr = "";
+	PPTokenInternal testToken;
+	PPTokenInternal returnToken = PPTokenInternal(this->getPosition(), "", \
+			OTHER, 0);
+	testToken = this->matchCharacterConstant();
+	testStr = testToken.getName();
+	if (testStr > longest) {
+		longest = testStr;
+		returnToken = testToken;
+	}
+	
+	return returnToken;
+}
+
+PPTokenInternal PostPPTokenizer :: matchCharacterConstant() {
+	PPToken first = source.peek();
+	unsigned int peekInt = 1;
+	string str = "";
+	string firstStr = first.getName();
+	if (!firstStr.compare("u") || !firstStr.compare("U") || !firstStr.compare("L")) {
+		str += firstStr;
+		first = source.peek(1); //Double quote should be here, if it is a match
+		peekInt = 2;
+	}
+	if (first.getName() == "'") {
+		str += first.getName();
+		PPToken token = source.peek(peekInt);
+		while (token.getName() != "'") {
+			token = source.peek(peekInt);
+			if (token.getName() == "\n") {
+				string err = "Found new-line while scanning string literal";
+				throw SyntaxException(err);
+			} 
+			//If the name is "\", that should also be an error, but that can
+			//not be implemented yet, as escape sequences are not handled.
+			str += token.getName();
+			++peekInt;
+		}
+		return PPTokenInternal(this->getPosition(), str, \
+				CONSTANT, peekInt);
+	} else {
+		return PPTokenInternal(this->getPosition(), "", OTHER, 0);
+	}
 }
 
 PPTokenInternal PostPPTokenizer :: matchStringLiteral() {

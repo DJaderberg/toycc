@@ -212,6 +212,8 @@ class PostPPTokenizer : Phase<PPToken, Token> {
 		PPTokenInternal matchKeyword();
 		PPTokenInternal matchPunctuator();
 		PPTokenInternal matchStringLiteral();
+		PPTokenInternal matchConstant();
+		PPTokenInternal matchCharacterConstant();
 		map<string, string> keywordMap;
 		void initKeywordMap(); //Fills the keywordMap with keywords
 		map<string, string> punctuatorMap;
