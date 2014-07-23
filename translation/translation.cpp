@@ -143,50 +143,6 @@ int phase2(istream *input, ostream *output) {
 	return 0;
 }
 
-template <class T>
-T BufferedSource<T> :: get() {
-	//If we've already used all items we've fetched from the unbuffered source, 
-	//fetch one more, add it to the buffer and return it.
-	if (this->used >= this->que.size()) {
-		T gotten = this->source->get();
-		que.push_back(gotten);
-		used++; //Since we're using the item that we just got
-		return gotten;
-		//Otherwise, return the next element in the buffer and move one step
-	} else {
-		return que.at(used++);
-	}
-}
-
-template <class T>
-T BufferedSource<T> :: peek() {
-	unsigned int temp_used = this->used;
-	T val = this->get();
-	this->used = temp_used; //Do not 'use' the element
-	return val;
-}
-
-//Look ahead as many elements as given in the argument.
-//@param ahead How many elements to look ahead. 0 (zero) is the same as peek().
-template <class T>
-T BufferedSource<T> :: peek(unsigned int ahead) {
-	unsigned int old_used = this->used;
-	T token = this->get();
-	for (int i = ahead; i > 0; --i) {
-		token = this->get();
-	}
-	this->used = old_used; //Restore the number of used items
-	return token;
-}
-
-template <class T>
-void BufferedSource<T> :: clearUsed() {
-	for (unsigned int i = 0; i < this->used; ++i) {
-		this->que.pop_front();
-	}
-	this->used = 0;
-}
-
 PPToken Lexer :: get() {
 	TokenKey key = OTHER;
 	string str = "";
