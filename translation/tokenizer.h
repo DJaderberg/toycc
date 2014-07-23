@@ -64,7 +64,7 @@ class PPTokenInternal : public PPToken {
 				unsigned int used = 1)  : PPToken(pos, name,id), used(used) {}
 		unsigned int getUsed() {return used;}
 	private:
-		unsigned int used; //Tells how many of the input were used to create this
+		unsigned int used; //How many tokens of the input were used to create this
 };
 
 //! A class holding a stream, which can hand back tokens from the stream

@@ -109,6 +109,7 @@ class Lexer : public Phase<char, PPToken> {
 		PPToken matchHeaderName();
 		PPToken matchComment();
 		PPToken matchIdentifier();
+		PPToken matchPPNumber();
 	private:
 		BufferedSource<char>* bufSource;
 };
@@ -210,6 +211,7 @@ class PostPPTokenizer : Phase<PPToken, Token> {
 		BufferedSource<PPToken>& source;
 		PPTokenInternal matchKeyword();
 		PPTokenInternal matchPunctuator();
+		PPTokenInternal matchStringLiteral();
 		map<string, string> keywordMap;
 		void initKeywordMap(); //Fills the keywordMap with keywords
 		map<string, string> punctuatorMap;

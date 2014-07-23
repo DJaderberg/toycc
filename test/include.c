@@ -14,5 +14,9 @@ int main() {
 #undef MAX
 	MAX(5,7);
 	return local+maximum;
+	char* str = "I am a string literal\n";
+	15;
+	21.2;
+	0x1234F5;
 }
 

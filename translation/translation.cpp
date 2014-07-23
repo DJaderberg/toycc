@@ -205,6 +205,16 @@ PPToken Lexer :: get() {
 		str = testStr;
 	}
 	this->bufSource->reset();
+	
+	//Match PPNumber
+	testToken = this->matchPPNumber();
+	testStr = testToken.getName();
+	if (testStr.length() > str.length()) {
+		key = PPNUMBER;
+		str = testStr;
+	}
+	this->bufSource->reset();
+
 
 	//Match other
 	if (str.length() == 0)
@@ -222,6 +232,34 @@ PPToken Lexer :: get() {
 	PPToken pptoken = PPToken(this->getPosition(), str, key);
 	return pptoken;
 
+}
+
+
+PPToken Lexer :: matchPPNumber() {
+	string str = "";
+	char current = source.get();
+	if (isdigit(current) || current == '.') {
+		str += current;
+		current = source.get();
+		while (isalnum(current) || current == '.') {
+			str += current;
+			if (current == 'e' || current == 'E' || current == 'p' || \
+					current == 'P') {
+				char expectedSign = source.get();
+				if (expectedSign == '+' || expectedSign == '-') {
+					str += expectedSign;
+					return PPToken(this->getPosition(), str, PPNUMBER);
+				} else {
+					string err = "Expected sign (+/-) after 'p','P','e','E' in"\
+								  "preprocessing-number.";
+					throw SyntaxException(err);
+				}
+			}
+			current = source.get();
+		}
+		return PPToken(this->getPosition(), str, PPNUMBER);
+	}
+	return PPToken(this->getPosition(), "", OTHER);
 }
 
 PPToken Lexer :: matchComment() {
@@ -340,7 +378,13 @@ Token PostPPTokenizer :: get() {
 		longest = testStr;
 		returnToken = testToken;
 	}
-
+	testToken = this->matchStringLiteral();
+	testStr = testToken.getName();
+	if (testStr > longest) {
+		longest = testStr;
+		returnToken = testToken;
+	}
+	
 	//If no match
 	if(longest == "") {
 		Token token = Token (this->source.get());
@@ -352,6 +396,37 @@ Token PostPPTokenizer :: get() {
 	}
 	this->source.clearUsed();
 	return Token (returnToken); //Type-cast to Token and return that
+}
+
+PPTokenInternal PostPPTokenizer :: matchStringLiteral() {
+	PPToken first = source.peek();
+	unsigned int peekInt = 1;
+	string str = "";
+	string firstStr = first.getName();
+	if (!firstStr.compare("u8") || !firstStr.compare("u") || !firstStr.compare("U") || !firstStr.compare("L")) {
+		str += firstStr;
+		first = source.peek(1); //Double quote should be here, if it is a match
+		peekInt = 2;
+	}
+	if (first.getName() == "\"") {
+		str += first.getName();
+		PPToken token = source.peek(peekInt);
+		while (token.getName() != "\"") {
+			token = source.peek(peekInt);
+			if (token.getName() == "\n") {
+				string err = "Found new-line while scanning string literal";
+				throw SyntaxException(err);
+			} 
+			//If the name is "\", that should also be an error, but that can
+			//not be implemented yet, as escape sequences are not handled.
+			str += token.getName();
+			++peekInt;
+		}
+		return PPTokenInternal(this->getPosition(), str, \
+				STRINGLITERAL, peekInt);
+	} else {
+		return PPTokenInternal(this->getPosition(), "", OTHER, 0);
+	}
 }
 
 PPTokenInternal PostPPTokenizer :: matchKeyword() {
@@ -397,7 +472,6 @@ PPTokenInternal PostPPTokenizer :: matchPunctuator() {
 }
 
 void PostPPTokenizer :: initPunctuatorMap() {
-	this->punctuatorMap["q"] = "q";
 	this->punctuatorMap["["] = "[";
 	this->punctuatorMap["]"] = "]";
 	this->punctuatorMap["("] = "(";
@@ -458,6 +532,7 @@ void PostPPTokenizer :: initKeywordMap() {
 	this->keywordMap["auto"] = "auto";
 	this->keywordMap["break"] = "break";
 	this->keywordMap["case"] = "case";
+	this->keywordMap["char"] = "char";
 	this->keywordMap["const"] = "const";
 	this->keywordMap["continue"] = "continue";
 	this->keywordMap["default"] = "default";
