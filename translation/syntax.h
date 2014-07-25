@@ -10,10 +10,14 @@ class Node {
 class TranslationUnit;
 class ExternalDeclaration;
 class Statement;
+class CompoundStatement;
 class ExpressionStatement;
+class SelectionStatement;
 class JumpStatement;
 class Expression;
 class Identifier;
+class BlockItemList;
+class BlockItem;
 
 class SyntaxTree {
 	public:
@@ -30,10 +34,14 @@ class Parser {
 		TranslationUnit* parseTranslationUnit();
 		ExternalDeclaration* parseExternalDeclaration();
 		Statement* parseStatement();
+		CompoundStatement* parseCompoundStatement();
 		ExpressionStatement* parseExpressionStatement();
+		SelectionStatement* parseSelectionStatement();
 		JumpStatement* parseJumpStatement();
 		Expression* parseExpression();
 		Identifier* parseIdentifier();
+		BlockItemList* parseBlockItemList();
+		BlockItem* parseBlockItem();
 	private:
 		BufferedSource<Token>* source;
 };
@@ -42,6 +50,7 @@ class Identifier : public Node {
 	public:
 		Identifier(Token token) : token(token) {}
 		string getName() {return token.getName();}
+		virtual ~Identifier() {}
 	private:
 		Token token;
 };
@@ -74,6 +83,70 @@ class Statement : public Node {
 		virtual ~Statement() {}
 };
 
+class BlockItem : public Node {
+	public:
+		/*BlockItem(Declaration* decl) : decl(decl) {} TODO: Implement*/
+		BlockItem(Statement* state) : state(state) {}
+		virtual ~BlockItem() {
+			if (state != NULL) delete state;
+			/*if (decl != NULL) delete decl;*/
+		}
+		string getName() {
+			if (state != NULL) {return state->getName();}
+			/*if (decl != NULL) {return decl->getName();}*/
+			return "";
+		}
+
+	private:
+		/*Declaration* decl;*/
+		Statement* state;
+};
+		
+class BlockItemList : public Node {
+	public:
+		BlockItemList(BlockItem* item) : item(item), next(NULL) {}
+		BlockItemList(BlockItem* item, BlockItemList* next) : item(item), \
+															  next(next) {}
+		string getName() {
+			string ret = item->getName();
+			if (next != NULL) {
+				ret += '\n' + next->getName();
+			}
+			return ret;
+		}
+		virtual ~BlockItemList() {
+			if (next != NULL) {delete next;}
+			delete item;
+		}
+	private:
+		BlockItem* item;
+		BlockItemList* next = NULL; //Optional, might be NULL
+};
+
+class BlockItemListException : public SyntaxException {
+	public:
+		BlockItemListException(string w) : SyntaxException(w) {}
+		BlockItemListException(char *w) : SyntaxException(w) {}
+};
+
+class CompoundStatement : public Statement {
+	public:
+		CompoundStatement() : itemList(NULL) {}
+		CompoundStatement (BlockItemList* itemList) : itemList(itemList) {}
+		virtual ~CompoundStatement() {delete itemList;}
+		string getName() {
+			string ret = "\{\n";
+			if (itemList != NULL) {
+				ret += itemList->getName();
+			}
+			ret += "\n}";
+			return ret;
+		}
+	private:
+		BlockItemList* itemList; //Optional, may be NULL
+
+};
+
 class ExpressionStatement : public Statement {
 	public:
 		ExpressionStatement(Expression* expr) : expression(expr)  {}
@@ -81,6 +154,30 @@ class ExpressionStatement : public Statement {
 		string getName() {return this->expression->getName() + ";";}
 	private:
 		Expression* expression;
+};
+
+class SelectionStatement : public Statement {
+	public:
+		SelectionStatement(string keyword, Expression* expr, Statement* state,\
+				Statement* stateOpt = NULL) : keyword(keyword), expr(expr), \
+			state(state), stateOpt(stateOpt) {}
+		string getName() {
+			string temp = keyword + " (";
+			temp += expr->getName();
+			temp += ") ";
+			temp += state->getName();
+			if (stateOpt != NULL) {
+				temp += " else ";
+				temp += stateOpt->getName();
+			}
+			return temp;
+		}
+		virtual ~SelectionStatement() {}
+	private:
+		string keyword;
+		Expression* expr;
+		Statement* state;
+		Statement* stateOpt;
 };
 
 class JumpStatement : public Statement {
@@ -104,6 +201,7 @@ class JumpStatement : public Statement {
 			temp += ";";
 			return temp;
 		}
+		virtual ~JumpStatement() {}
 	private:
 		string keyword;
 		Identifier* id = NULL;
