@@ -6,7 +6,8 @@ int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		filename = argv[1];
 	} else {
-		filename = "/Users/David/toycc/test/include.c";
+		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
+		filename = "/Users/David/toycc/test/expressionStatement.c"; //Parsing
 	}
 	try {
 	return translate(filename);
@@ -48,7 +49,24 @@ int translate(string filename) {
 	BufferedSource<Token>* bufStrLitConCatSource = new BufferedSource<Token>\
 												   (whitespacecleaner);
 	StrLitConCat* strlitconcat = new StrLitConCat(*bufStrLitConCatSource);
+	BufferedSource<Token>* bufParserSource = new BufferedSource<Token>\
+											 (strlitconcat);
+	Parser* parser = new Parser(bufParserSource);
+	//Parsing printing code
+	Expression* ptr = NULL;
 	while (true) {
+		ptr = NULL;
+		Statement* ptr = parser->parseStatement();
+		if (ptr == NULL) {
+			cout << "Could not parse expression" << '\n';
+			return 0;
+		} else {
+			cout << ptr->getName() << '\n';
+		}
+	}
+		
+	//Tokenization printing code
+	/*while (true) {
 		Token token = strlitconcat->get();
 		string current = token.getName();
 		TokenKey key = token.getKey();
@@ -61,7 +79,7 @@ int translate(string filename) {
 		{
 			break;
 		}
-	}
+	}*/
 	return 0;
 }
 
