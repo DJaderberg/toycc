@@ -94,14 +94,17 @@ BlockItemList* Parser :: parseBlockItemList() {
 BlockItem* Parser :: parseBlockItem() {
 	//TODO: Implement declarations
 	BlockItem* ret = NULL;
+	unsigned int bufferUsed = source->bufferSize();
 	try {
 		ret = new BlockItem(parseStatement());
-	} catch (DeclarationException) {
+	} catch (ExpressionException) {
 		//No match with Statement, keep trying other things
 	}
 	//If it was not a Statement, it should be a Declaration
 	if( ret == NULL) {
-		ret = new BlockItem(parseStatement());
+		source->setUsed(bufferUsed);
+		Declaration* decl = parseDeclaration();
+		ret = new BlockItem(decl);
 	}
 	return ret;
 }
@@ -113,7 +116,7 @@ ExpressionStatement* Parser :: parseExpressionStatement() {
 	Token after = source->get();
 	if (after.getName() != ";") {
 		string err = "Expected ';' after ExpressionStatement";
-		throw SyntaxException(err);
+		throw ExpressionException(err);
 	}
 	return new ExpressionStatement(expr);
 }
@@ -207,7 +210,7 @@ Expression* Parser :: parseExpression() {
 		ptr = new Expression(token);
 	} else {
 		string err = "Expected identifier";
-		throw SyntaxException(err);
+		throw ExpressionException(err);
 	}
 	return ptr;
 }
@@ -229,7 +232,7 @@ Declarator* Parser :: parseDeclarator() {
 	try {
 		dirDecl = parseDirectDeclarator();
 		ret = new Declarator(dirDecl);
-	} catch (DirectDeclaratorException) {
+	} catch (DirectDeclaratorException& error) {
 		string err = "Could not parse direct declarator in declarator";
 		throw new DeclaratorException(err);
 	}
@@ -239,7 +242,8 @@ Declarator* Parser :: parseDeclarator() {
 DirectDeclarator* Parser :: parseDirectDeclarator() {
 	//TODO: Expand when DirectDeclarator has been expanded
 	DirectDeclarator* ret = NULL;
-	if (source->peek().getName() == "(") {
+	Token peek = source->peek();
+	if (peek.getName() == "(") {
 		source->get();
 		Declarator* decl = parseDeclarator();
 		if (source->get().getName() == ")") {
@@ -248,9 +252,10 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 			string err = "Expected ')' after declarator in direct declarator";
 			throw new DirectDeclaratorException(err);
 		}
+	} else if (peek.getKey() == IDENTIFIER) {
+		ret = new DirectDeclarator(parseIdentifier());
 	} else {
-		string err = "Expected '(' to start direct declarator";
-		throw new DirectDeclaratorException(err);
+		ret = NULL;
 	}
 	return ret;
 }
@@ -271,11 +276,15 @@ InitDeclaratorList* Parser :: parseInitDeclaratorList() {
 	InitDeclarator* first = NULL;
 	try {
 		first = parseInitDeclarator();
+		Token after = source->get();
+		if (after.getName() == ",") {
+			return new InitDeclaratorList(first, parseInitDeclaratorList());
+		}
 	} catch (InitDeclaratorException) {
 		string err = "Could not parse init declarator in init declarator list";
 		throw new InitDeclaratorListException(err);
 	}
-	return new InitDeclaratorList(first, parseInitDeclaratorList());
+	return new InitDeclaratorList(first);
 }
 
 InitDeclarator* Parser :: parseInitDeclarator() {
@@ -289,4 +298,5 @@ InitDeclarator* Parser :: parseInitDeclarator() {
 	}
 	return ret;
 }
+
 

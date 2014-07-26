@@ -98,6 +98,11 @@ class Expression : public Node {
 		Token identifier;
 };
 
+class ExpressionException : public SyntaxException {
+	public:
+		ExpressionException(string w) : SyntaxException(w) {}
+		ExpressionException(char* w) : SyntaxException(w) {}
+};
 
 class ExternalDeclaration : public Node {
 };
@@ -312,6 +317,5 @@ class DeclarationException : public SyntaxException {
 	DeclarationException(string w) : SyntaxException(w) {}
 	DeclarationException(char *w) : SyntaxException(w) {}
 };
-
 
 

@@ -86,6 +86,7 @@ class BufferedSource : public Source<T> {
 		bool empty() {return source->empty();}
 		virtual ~BufferedSource() {}
 		unsigned int bufferSize() {return used;}
+		void setUsed(unsigned int in) {this->used = in;}
 	private:
 		unsigned int used;
 		Source<T>* source;

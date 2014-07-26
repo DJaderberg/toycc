@@ -19,7 +19,9 @@ int main(int argc, char *argv[]) {
 	} catch (runtime_error& error) {
 		cout << "Error: " << error.what() << "\n";
 		return 1;
-	} 
+	} catch (...) {
+		cout << "Unknown exception" << '\n';
+	}
 }
 
 int translate(string filename) {
