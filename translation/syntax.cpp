@@ -1,5 +1,30 @@
 #include "syntax.h"
 
+Declarator :: ~Declarator() {
+	if (dirDecl != NULL) {delete dirDecl;}
+	/*if (pointer != NULL) {delete pointer;}*/
+}
+
+string Declarator :: getName() {
+	string ret = "";
+	if (pointer != NULL) {
+		//ret += pointer->getName() + " ";
+	}
+	ret += dirDecl->getName();
+	return ret;
+}
+
+BlockItem :: ~BlockItem() {
+	if (state != NULL) delete state;
+	if (decl != NULL) delete decl;
+}
+
+string BlockItem :: getName() {
+	if (state != NULL) {return state->getName();}
+	if (decl != NULL) {return decl->getName();}
+	return "";
+}
+
 /*TranslationUnit* Parser :: parseTranslationUnit() {
 	list<ExternalDeclaration*> list;
 	ExternalDeclaration* ptr;
@@ -70,11 +95,11 @@ BlockItem* Parser :: parseBlockItem() {
 	//TODO: Implement declarations
 	BlockItem* ret = NULL;
 	try {
-		ret = new BlockItem(parseDeclaration());
+		ret = new BlockItem(parseStatement());
 	} catch (DeclarationException) {
-		//No match with declaration, keep trying other things
+		//No match with Statement, keep trying other things
 	}
-	//If it was not a Declaration, it should be a Statement
+	//If it was not a Statement, it should be a Declaration
 	if( ret == NULL) {
 		ret = new BlockItem(parseStatement());
 	}
@@ -236,7 +261,7 @@ Declaration* Parser :: parseDeclaration() {
 	try {
 		ret = new Declaration(parseInitDeclaratorList());
 	} catch (InitDeclaratorListException) {
-		//No problem, since the lsit is optional
+		//No problem, since the list is optional
 		ret = new Declaration();
 	}
 	return ret;

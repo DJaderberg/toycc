@@ -296,7 +296,7 @@ class InitDeclaratorListException : public SyntaxException {
 };
 
 class Declaration : public Node {
-	//TODO: Implement Declaratio specifiers and static_assert declarations
+	//TODO: Implement Declaration specifiers and static_assert declarations
 	public:
 		Declaration() : initList(NULL) {}
 		Declaration(InitDeclaratorList* initList) : initList(initList) {}
@@ -313,28 +313,5 @@ class DeclarationException : public SyntaxException {
 	DeclarationException(char *w) : SyntaxException(w) {}
 };
 
-Declarator :: ~Declarator() {
-	if (dirDecl != NULL) {delete dirDecl;}
-	/*if (pointer != NULL) {delete pointer;}*/
-}
 
-string Declarator :: getName() {
-	string ret = "";
-	if (pointer != NULL) {
-		//ret += pointer->getName() + " ";
-	}
-	ret += dirDecl->getName();
-	return ret;
-}
-
-BlockItem :: ~BlockItem() {
-	if (state != NULL) delete state;
-	if (decl != NULL) delete decl;
-}
-
-string BlockItem :: getName() {
-	if (state != NULL) {return state->getName();}
-	if (decl != NULL) {return decl->getName();}
-	return "";
-}
 
