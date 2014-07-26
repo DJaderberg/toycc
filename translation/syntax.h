@@ -1,10 +1,37 @@
 #include "source.h"
 
+//! Abstract base class for all classes in the AST
+/*! A pure virtual function here forces all subclasses, i.e. all classes in
+ *  the Abstract Syntax Tree (AST) to implement the function
+ */
 class Node {
 	public:
 		Node() {}
-		virtual string getName() = 0;
+		virtual string getName() = 0; //Returns string representation of object
 		virtual ~Node() {}
+};
+
+//A template class to handle repeating occurences of some class
+template<class T>
+class NodeList : public Node {
+	public:
+		NodeList(T* item) : item(item), next(NULL) {}
+		NodeList(T* item, NodeList* next) : item(item), \
+															  next(next) {}
+		string getName() {
+			string ret = item->getName();
+			if (next != NULL) {
+				ret += '\n' + next->getName();
+			}
+			return ret;
+		}
+		virtual ~NodeList() {
+			if (next != NULL) {delete next;}
+			delete item;
+		}
+	private:
+		T* item;
+		NodeList* next = NULL; //Optional, might be NULL
 };
 
 class TranslationUnit;
@@ -16,17 +43,17 @@ class SelectionStatement;
 class JumpStatement;
 class Expression;
 class Identifier;
-class BlockItemList;
 class BlockItem;
+typedef NodeList<BlockItem> BlockItemList;
+class Declaration;
+class InitDeclarator;
+typedef NodeList<InitDeclarator> InitDeclaratorList;
+class Declarator;
+class DirectDeclarator;
+class Initializer;
+class Pointer;
 
-class SyntaxTree {
-	public:
-		SyntaxTree(Node& root) : root(root) {}
-		Node& getRoot() {return this->root;}
-	private:
-		Node& root;
-};
-
+//Constructs an AST from the input Tokens
 class Parser {
 	public:
 		Parser(BufferedSource<Token>* source) : source(source) {}
@@ -42,6 +69,12 @@ class Parser {
 		Identifier* parseIdentifier();
 		BlockItemList* parseBlockItemList();
 		BlockItem* parseBlockItem();
+		Declarator* parseDeclarator();
+		DirectDeclarator* parseDirectDeclarator();
+		InitDeclarator* parseInitDeclarator();
+		InitDeclaratorList* parseInitDeclaratorList();
+		Declaration* parseDeclaration();
+
 	private:
 		BufferedSource<Token>* source;
 };
@@ -85,42 +118,13 @@ class Statement : public Node {
 
 class BlockItem : public Node {
 	public:
-		/*BlockItem(Declaration* decl) : decl(decl) {} TODO: Implement*/
+		BlockItem(Declaration* decl) : decl(decl) {}
 		BlockItem(Statement* state) : state(state) {}
-		virtual ~BlockItem() {
-			if (state != NULL) delete state;
-			/*if (decl != NULL) delete decl;*/
-		}
-		string getName() {
-			if (state != NULL) {return state->getName();}
-			/*if (decl != NULL) {return decl->getName();}*/
-			return "";
-		}
-
+		virtual ~BlockItem();
+		string getName();
 	private:
-		/*Declaration* decl;*/
+		Declaration* decl;
 		Statement* state;
-};
-		
-class BlockItemList : public Node {
-	public:
-		BlockItemList(BlockItem* item) : item(item), next(NULL) {}
-		BlockItemList(BlockItem* item, BlockItemList* next) : item(item), \
-															  next(next) {}
-		string getName() {
-			string ret = item->getName();
-			if (next != NULL) {
-				ret += '\n' + next->getName();
-			}
-			return ret;
-		}
-		virtual ~BlockItemList() {
-			if (next != NULL) {delete next;}
-			delete item;
-		}
-	private:
-		BlockItem* item;
-		BlockItemList* next = NULL; //Optional, might be NULL
 };
 
 class BlockItemListException : public SyntaxException {
@@ -150,7 +154,7 @@ class CompoundStatement : public Statement {
 class ExpressionStatement : public Statement {
 	public:
 		ExpressionStatement(Expression* expr) : expression(expr)  {}
-		virtual ~ExpressionStatement() {}
+		virtual ~ExpressionStatement() {delete expression;}
 		string getName() {return this->expression->getName() + ";";}
 	private:
 		Expression* expression;
@@ -172,7 +176,11 @@ class SelectionStatement : public Statement {
 			}
 			return temp;
 		}
-		virtual ~SelectionStatement() {}
+		virtual ~SelectionStatement() {
+			if (expr != NULL) {delete expr;}
+			if (state != NULL) {delete state;}
+			if (stateOpt != NULL) {delete stateOpt;}
+		}
 	private:
 		string keyword;
 		Expression* expr;
@@ -201,12 +209,132 @@ class JumpStatement : public Statement {
 			temp += ";";
 			return temp;
 		}
-		virtual ~JumpStatement() {}
+		virtual ~JumpStatement() {
+			if (id != NULL) {delete id;}
+			if (expr != NULL) {delete expr;}
+		}
 	private:
 		string keyword;
 		Identifier* id = NULL;
 		Expression* expr = NULL;
 };
 
+class Declarator : public Node {
+	//TODO: Implement the optional Pointer here
+	public:
+		Declarator(DirectDeclarator* dirDecl) : dirDecl(dirDecl), pointer(NULL) {}
+		Declarator(DirectDeclarator* dirDecl, Pointer* pointer) : dirDecl(dirDecl), pointer(pointer) {}
+		virtual ~Declarator(); 
+		string getName();
+			private:
+		DirectDeclarator* dirDecl;
+		Pointer* pointer;
+};
 
+class DeclaratorException : public SyntaxException {
+	public:
+		DeclaratorException(string w) : SyntaxException(w) {}
+		DeclaratorException(char * w) : SyntaxException(w) {}
+};
+
+class DirectDeclarator : public Node {
+	//TODO: Implement complicated versions
+	public:
+		DirectDeclarator(Identifier* id) : id(id), decl(NULL) {}
+		DirectDeclarator(Declarator* decl) : id(NULL), decl(decl) {}
+		virtual ~DirectDeclarator() {
+			if (id != NULL) {delete id;}
+			if (decl != NULL) {delete decl;}
+		}
+		string getName() {
+			string ret = "";
+			if (id != NULL) {ret = id->getName();}
+			if (decl != NULL) {ret = decl->getName();}
+			return ret;
+		}
+	private:
+		Identifier* id;
+		Declarator* decl;
+};
+
+class DirectDeclaratorException : public SyntaxException {
+	public:
+		DirectDeclaratorException(string w) : SyntaxException(w) {}
+		DirectDeclaratorException(char * w) : SyntaxException(w) {}
+};
+
+class InitDeclarator : public Node {
+	public:
+		InitDeclarator(Declarator* dec) : dec(dec), init(NULL) {}
+		InitDeclarator(Declarator* dec, Initializer* init) : dec(dec), \
+															 init(init) {}
+		virtual ~InitDeclarator() {
+			if (dec != NULL) {delete dec;}
+			/*if (init != NULL) {delete init;} TODO: Implement Initializer */
+		}
+		string getName() {
+			string ret = "";
+			if (dec != NULL) {ret += dec->getName();}
+			/*if (init != NULL) {ret += " = " + init->getName();}*/
+			return ret;
+		}
+	private:
+		Declarator* dec;
+		Initializer* init;
+};
+
+class InitDeclaratorException : public SyntaxException {
+	public:
+		InitDeclaratorException(string w) : SyntaxException(w) {}
+		InitDeclaratorException(char * w) : SyntaxException(w) {}
+};
+
+class InitDeclaratorListException : public SyntaxException {
+	public:
+		InitDeclaratorListException(string w) : SyntaxException(w) {}
+		InitDeclaratorListException(char * w) : SyntaxException(w) {}
+};
+
+class Declaration : public Node {
+	//TODO: Implement Declaratio specifiers and static_assert declarations
+	public:
+		Declaration() : initList(NULL) {}
+		Declaration(InitDeclaratorList* initList) : initList(initList) {}
+		virtual ~Declaration() {if (initList != NULL) {delete initList;}}
+		string getName() {
+			return initList->getName(); //TODO: Change
+		}
+	private:
+		InitDeclaratorList* initList;
+};
+
+class DeclarationException : public SyntaxException {
+	DeclarationException(string w) : SyntaxException(w) {}
+	DeclarationException(char *w) : SyntaxException(w) {}
+};
+
+Declarator :: ~Declarator() {
+	if (dirDecl != NULL) {delete dirDecl;}
+	/*if (pointer != NULL) {delete pointer;}*/
+}
+
+string Declarator :: getName() {
+	string ret = "";
+	if (pointer != NULL) {
+		//ret += pointer->getName() + " ";
+	}
+	ret += dirDecl->getName();
+	return ret;
+}
+
+BlockItem :: ~BlockItem() {
+	if (state != NULL) delete state;
+	if (decl != NULL) delete decl;
+}
+
+string BlockItem :: getName() {
+	if (state != NULL) {return state->getName();}
+	if (decl != NULL) {return decl->getName();}
+	return "";
+}
 

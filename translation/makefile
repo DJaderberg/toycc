@@ -1,5 +1,5 @@
 CC      = g++
-CFLAGS  = -Wall -Wextra -Werror -std=c++11
+CFLAGS  = -Wall -Wextra -std=c++11
 LDFLAGS = 
 OBJECTS = translation.o preprocessing.o source.o syntax.o
 all: translation 

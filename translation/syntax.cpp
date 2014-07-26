@@ -68,7 +68,17 @@ BlockItemList* Parser :: parseBlockItemList() {
 
 BlockItem* Parser :: parseBlockItem() {
 	//TODO: Implement declarations
-	return new BlockItem(parseStatement());
+	BlockItem* ret = NULL;
+	try {
+		ret = new BlockItem(parseDeclaration());
+	} catch (DeclarationException) {
+		//No match with declaration, keep trying other things
+	}
+	//If it was not a Declaration, it should be a Statement
+	if( ret == NULL) {
+		ret = new BlockItem(parseStatement());
+	}
+	return ret;
 }
 
 
@@ -109,7 +119,7 @@ SelectionStatement* Parser :: parseSelectionStatement() {
 		err = "Expected ')' after expression in selection statement";
 		throw new SyntaxException(err);
 	}
-	state = parseStatement(); //TODO: NULL here sometimes
+	state = parseStatement();
 	if (state == NULL) {
 		err = "Could not parse first statement arm in selection statement";
 		throw new SyntaxException(err);
@@ -185,5 +195,73 @@ Identifier* Parser :: parseIdentifier() {
 		string err = "Expected identifier";
 		throw new SyntaxException(err);
 	}
+}
+
+Declarator* Parser :: parseDeclarator() {
+	//TODO: Implement optional pointers
+	Declarator* ret = NULL;
+	DirectDeclarator* dirDecl = NULL;
+	try {
+		dirDecl = parseDirectDeclarator();
+		ret = new Declarator(dirDecl);
+	} catch (DirectDeclaratorException) {
+		string err = "Could not parse direct declarator in declarator";
+		throw new DeclaratorException(err);
+	}
+	return ret;
+}
+
+DirectDeclarator* Parser :: parseDirectDeclarator() {
+	//TODO: Expand when DirectDeclarator has been expanded
+	DirectDeclarator* ret = NULL;
+	if (source->peek().getName() == "(") {
+		source->get();
+		Declarator* decl = parseDeclarator();
+		if (source->get().getName() == ")") {
+			ret = new DirectDeclarator(decl);
+		} else {
+			string err = "Expected ')' after declarator in direct declarator";
+			throw new DirectDeclaratorException(err);
+		}
+	} else {
+		string err = "Expected '(' to start direct declarator";
+		throw new DirectDeclaratorException(err);
+	}
+	return ret;
+}
+
+Declaration* Parser :: parseDeclaration() {
+	//TODO: Expand
+	Declaration* ret = NULL;
+	try {
+		ret = new Declaration(parseInitDeclaratorList());
+	} catch (InitDeclaratorListException) {
+		//No problem, since the lsit is optional
+		ret = new Declaration();
+	}
+	return ret;
+}
+
+InitDeclaratorList* Parser :: parseInitDeclaratorList() {
+	InitDeclarator* first = NULL;
+	try {
+		first = parseInitDeclarator();
+	} catch (InitDeclaratorException) {
+		string err = "Could not parse init declarator in init declarator list";
+		throw new InitDeclaratorListException(err);
+	}
+	return new InitDeclaratorList(first, parseInitDeclaratorList());
+}
+
+InitDeclarator* Parser :: parseInitDeclarator() {
+	//TODO: Implement ' = Initializer'
+	InitDeclarator* ret = NULL;
+	try {
+		ret = new InitDeclarator(parseDeclarator());
+	} catch (DeclaratorException) {
+		string err = "Could not parse declarator in init declarator";
+		throw new InitDeclaratorException(err);
+	}
+	return ret;
 }
 
