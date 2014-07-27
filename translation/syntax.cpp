@@ -203,16 +203,44 @@ JumpStatement* Parser :: parseJumpStatement() {
 	return ret;
 }
 
+/* Thanks to 
+ * http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
+ * for attempting to explain Pratt parsers.
+ */
 Expression* Parser :: parseExpression() {
-	Token token = source->get();
+	/*Token token = source->get();
 	Expression* ptr = NULL;
 	if (token.getKey() == IDENTIFIER) {
-		ptr = new Expression(token);
+		ptr = new IdentifierExpression(token);
 	} else {
 		string err = "Expected identifier";
 		throw ExpressionException(err);
 	}
-	return ptr;
+	return ptr;*/
+	Expression* ret = NULL;
+	Token token = source->get();
+	auto searchPrefix = mPrefix.find(token.getName());
+	Expression* left = NULL;
+	if (token.getKey() == IDENTIFIER) {
+		left = new IdentifierExpression(token);
+	} else if (searchPrefix != mPrefix.end()) {
+		//Found current token as prefix operator
+		left = searchPrefix->second(this, parseExpression());
+	} else {
+		string err = "Could not parse '" + token.getName() + "'";
+	}
+	
+	token = source->peek();
+	auto searchInfix = mInfix.find(token.getName());
+	if (searchInfix != mInfix.end()) {
+		//Found current token as infix operator
+		source->get(); //Actually consume the peeked token
+		ret = searchInfix->second(this, left);
+	} else {
+		//No infix here, so just return the prefix parsing
+		ret = left;
+	}
+	return ret;
 }
 
 Identifier* Parser :: parseIdentifier() {

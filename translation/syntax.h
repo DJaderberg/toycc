@@ -1,8 +1,10 @@
 #include "source.h"
 
+const string AdditionOpStr = "+";
 enum PriorityEnum {PRIMARY, POSTFIX, UNARY, CAST, MULTIPLICATIVE, ADDITIVE,\
 	SHIFT, RELATIONAL, EQUALITY, BITWISE_AND, BITWISE_XOR, BITWISE_OR, \
 		LOGICAL_AND, LOGICAL_OR, CONDITIONAL, ASSIGNMENT};
+class Parser;
 
 //! Abstract base class for all classes in the AST
 /*! A pure virtual function here forces all subclasses, i.e. all classes in
@@ -38,13 +40,18 @@ class NodeList : public Node {
 		NodeList* next = NULL; //Optional, might be NULL
 };
 
-class Operator : public Node {
+class Expression : public Node {
+};
+
+class Operator : public Expression {
 	public:
-		Operator(const string* opStr, PriorityEnum prio) : opStr(*opStr), \
-														  prio(prio) {}
+		Operator(Parser* parser, const string* opStr, PriorityEnum prio) \
+			: parser(parser), opStr(*opStr), prio(prio) {}
 		virtual ~Operator() {}
 		string getName() {return opStr;}
-		PriorityEnum getPrio() {return prio;}
+		PriorityEnum getPriority() {return prio;}
+	protected:
+		Parser* parser;
 	private:
 		const string opStr; //String representation of the punctuator for this
 		//operator, e.g. "+" for Addition.
@@ -54,28 +61,49 @@ class Operator : public Node {
 template<class T>
 class PrefixOperator : public Operator {
 	public:
-		PrefixOperator(T* item, const string* opStr, PriorityEnum prio) \
-			: Operator(opStr, prio), item(item) {}
+		PrefixOperator(Parser* parser, const string* opStr, PriorityEnum prio) \
+			: Operator(parser, opStr, prio), item(item) {}
 		virtual ~PrefixOperator() {delete item;}
-		string getName() {return Operator::getName() + item->getName();}
+		string getName() {
+			string ret = "";
+			ret += Operator::getName();
+			if (item != NULL) {ret += item->getName();}
+			return ret;
+		}
 	private:
 		T* item; //The item to operate on
 };
 
+class InfixOperator : public Operator {
+	public:
+		InfixOperator(Parser* parser, const string* opStr, PriorityEnum prio) \
+			: Operator(parser, opStr, prio) {}
+		virtual ~InfixOperator() {}
+};
+
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
-class BinaryOperator : public Operator {
+class BinaryOperator : public InfixOperator {
 	public:
 		/*BinaryOperator(Operator* rhs, Operator* lhs, string opStr,\
 			   	PriorityEnum prio) : Operator(opStr, prio), rhs(rhs), \
 									 lhs(lhs) {}*/
-		BinaryOperator(Op* rhs, Op* lhs) : Operator(opStrTemp, prioTemp), \
-													   rhs(rhs), lhs(lhs) {}
+		BinaryOperator(Parser* parser, Op* lhs) : \
+			InfixOperator(parser, opStrTemp, prioTemp), lhs(lhs) {
+				parseRhs(parser);
+			}
+		void parseRhs(Parser* parser);
 		virtual ~BinaryOperator() {
 			if (rhs != NULL) {delete rhs;}
 			if (lhs != NULL) {delete lhs;}
 		}
-		string getName() {return rhs->getName() + Operator::getName() + \
-			lhs->getName();}
+		string getName() {
+			string ret = "";
+			if (lhs !=NULL) {ret += lhs->getName();}
+			ret += Operator::getName();
+			if (rhs !=NULL) {ret += rhs->getName();}
+			return ret;
+		}
+		Expression* parse();
 	private:
 		Op* rhs; //The right hand side 
 		Op* lhs; //The left hand side
@@ -88,7 +116,6 @@ class CompoundStatement;
 class ExpressionStatement;
 class SelectionStatement;
 class JumpStatement;
-class Expression;
 class Identifier;
 class BlockItem;
 typedef NodeList<BlockItem> BlockItemList;
@@ -99,6 +126,8 @@ class Declarator;
 class DirectDeclarator;
 class Initializer;
 class Pointer;
+class Expression;
+class IdentifierExpression;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -121,7 +150,12 @@ class Parser {
 		InitDeclarator* parseInitDeclarator();
 		InitDeclaratorList* parseInitDeclaratorList();
 		Declaration* parseDeclaration();
-		map<string, Operator*> mInfix;
+		map<string, PrefixOperator<Expression>* (*) (Parser*, Expression*)> mPrefix; 
+		//Maps string to pointer to function which returns type Expression* and
+		//takes types Parser*, Expression* as input
+		map<string, InfixOperator* (*) (Parser*, Expression*)> mInfix; 
+		//Maps string to pointer to function which returns type Expression* and
+		//takes types Parser*, Expression* as input
 	private:
 		BufferedSource<Token>* source;
 };
@@ -135,14 +169,16 @@ class Identifier : public Node {
 		Token token;
 };
 
-class Expression : public Node {
+class IdentifierExpression : public Expression {
 	public:
-		Expression() {}
-		Expression(Token token) : identifier(token) {}
-		virtual ~Expression() {}
-		string getName() {return this->identifier.getName();}
+		IdentifierExpression(Token token) : identifier(new Identifier(token)) {}
+		IdentifierExpression(Identifier* identifier) : identifier(identifier) {}
+		virtual ~IdentifierExpression() {
+			if (identifier != NULL) {delete identifier;}
+		}
+		string getName() {return identifier->getName();}
 	private:
-		Token identifier;
+		Identifier* identifier = NULL;
 };
 
 class ExpressionException : public SyntaxException {
@@ -365,15 +401,25 @@ class DeclarationException : public SyntaxException {
 	DeclarationException(char *w) : SyntaxException(w) {}
 };
 
-
 const string AssignmentOpStr = "=";
 class Assignment : public BinaryOperator<Expression, &AssignmentOpStr, ASSIGNMENT> {
 	public:
-		Assignment(Expression* rhs, Expression* lhs) : BinaryOperator(rhs, lhs) {}
+		Assignment(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BinaryOperator* create(Parser* parser, Expression* lhs)\
+	   	{return new Assignment(parser, lhs);}
 };
-const string AdditionOpStr = "+";
+
 class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 	public:
-		Addition(Expression* rhs, Expression* lhs) : BinaryOperator(rhs, lhs) {}
+		Addition(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BinaryOperator* create(Parser* parser, Expression* lhs) \
+		{return new Addition(parser, lhs);}
 };
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+void BinaryOperator<Op, opStrTemp, prioTemp>::parseRhs(Parser* parser) {
+	rhs = parser->parseExpression();
+}
 
