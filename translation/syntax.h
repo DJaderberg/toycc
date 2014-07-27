@@ -1,5 +1,9 @@
 #include "source.h"
 
+enum PriorityEnum {PRIMARY, POSTFIX, UNARY, CAST, MULTIPLICATIVE, ADDITIVE,\
+	SHIFT, RELATIONAL, EQUALITY, BITWISE_AND, BITWISE_XOR, BITWISE_OR, \
+		LOGICAL_AND, LOGICAL_OR, CONDITIONAL, ASSIGNMENT};
+
 //! Abstract base class for all classes in the AST
 /*! A pure virtual function here forces all subclasses, i.e. all classes in
  *  the Abstract Syntax Tree (AST) to implement the function
@@ -32,6 +36,49 @@ class NodeList : public Node {
 	private:
 		T* item;
 		NodeList* next = NULL; //Optional, might be NULL
+};
+
+class Operator : public Node {
+	public:
+		Operator(const string* opStr, PriorityEnum prio) : opStr(*opStr), \
+														  prio(prio) {}
+		virtual ~Operator() {}
+		string getName() {return opStr;}
+		PriorityEnum getPrio() {return prio;}
+	private:
+		const string opStr; //String representation of the punctuator for this
+		//operator, e.g. "+" for Addition.
+		PriorityEnum prio; //Priority for this operator
+};
+
+template<class T>
+class PrefixOperator : public Operator {
+	public:
+		PrefixOperator(T* item, const string* opStr, PriorityEnum prio) \
+			: Operator(opStr, prio), item(item) {}
+		virtual ~PrefixOperator() {delete item;}
+		string getName() {return Operator::getName() + item->getName();}
+	private:
+		T* item; //The item to operate on
+};
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+class BinaryOperator : public Operator {
+	public:
+		/*BinaryOperator(Operator* rhs, Operator* lhs, string opStr,\
+			   	PriorityEnum prio) : Operator(opStr, prio), rhs(rhs), \
+									 lhs(lhs) {}*/
+		BinaryOperator(Op* rhs, Op* lhs) : Operator(opStrTemp, prioTemp), \
+													   rhs(rhs), lhs(lhs) {}
+		virtual ~BinaryOperator() {
+			if (rhs != NULL) {delete rhs;}
+			if (lhs != NULL) {delete lhs;}
+		}
+		string getName() {return rhs->getName() + Operator::getName() + \
+			lhs->getName();}
+	private:
+		Op* rhs; //The right hand side 
+		Op* lhs; //The left hand side
 };
 
 class TranslationUnit;
@@ -74,7 +121,7 @@ class Parser {
 		InitDeclarator* parseInitDeclarator();
 		InitDeclaratorList* parseInitDeclaratorList();
 		Declaration* parseDeclaration();
-
+		map<string, Operator*> mInfix;
 	private:
 		BufferedSource<Token>* source;
 };
@@ -318,4 +365,15 @@ class DeclarationException : public SyntaxException {
 	DeclarationException(char *w) : SyntaxException(w) {}
 };
 
+
+const string AssignmentOpStr = "=";
+class Assignment : public BinaryOperator<Expression, &AssignmentOpStr, ASSIGNMENT> {
+	public:
+		Assignment(Expression* rhs, Expression* lhs) : BinaryOperator(rhs, lhs) {}
+};
+const string AdditionOpStr = "+";
+class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
+	public:
+		Addition(Expression* rhs, Expression* lhs) : BinaryOperator(rhs, lhs) {}
+};
 
