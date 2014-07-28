@@ -259,8 +259,10 @@ class ExpressionStatement : public Statement {
 		virtual ~ExpressionStatement() {delete expression;}
 		string getName() {
 			string ret = "";
-			if (expression != NULL) {return expression->getName();}
-			return ret + ";";}
+			if (expression != NULL) {ret += expression->getName();}
+			ret += ";";
+			return ret;
+		}
 	private:
 		Expression* expression = NULL;
 };
@@ -434,6 +436,15 @@ class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 			: BinaryOperator(parser, lhs) {}
 		static BinaryOperator* create(Parser* parser, Expression* lhs) \
 		{return new Addition(parser, lhs);}
+};
+
+const string SubtractionOpStr = "-";
+class Subtraction : public BinaryOperator<Expression, &SubtractionOpStr, ADDITIVE> {
+	public:
+		Subtraction(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BinaryOperator* create(Parser* parser, Expression* lhs) \
+		{return new Subtraction(parser, lhs);}
 };
 
 const string MultiplicationOpStr = "*";

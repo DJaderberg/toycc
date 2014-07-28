@@ -56,6 +56,7 @@ int translate(string filename) {
 	Parser* parser = new Parser(bufParserSource);
 	//Insert all the operators into the Parser maps
 	parser->mInfix["+"] = (InfixOperator *(*)(Parser *, Expression *)) Addition::create;
+	parser->mInfix["-"] = (InfixOperator *(*)(Parser *, Expression *)) Subtraction::create;
 	parser->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) Assignment::create;
 	parser->mInfix["*"] = (InfixOperator *(*)(Parser *, Expression *)) Multiplication::create;
 	//Parsing printing code

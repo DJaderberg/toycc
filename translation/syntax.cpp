@@ -246,12 +246,12 @@ Expression* Parser :: parseExpression(PriorityEnum priority) {
 			left = searchInfix->second(this, left);
 			left->parse(this);
 			token = source->peek();
-			if (token.getName() == ";") {break;}
 			searchInfix = mInfix.find(token.getName());
 			delete dummy;
-			dummy = searchInfix->second(this,NULL);
+			if (searchInfix != mInfix.end()) {
+				dummy = searchInfix->second(this,NULL);
+			}
 		}
-		delete dummy;
 		ret = left;
 	} else {
 		//No infix here, so just return the prefix parsing
