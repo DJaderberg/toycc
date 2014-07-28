@@ -4,7 +4,7 @@ LDFLAGS =
 OBJECTS = translation.o preprocessing.o source.o syntax.o
 all: translation 
 
-translation: $(OBJECTS) 
+translation: $(OBJECTS)
 	$(CC) -o translation $^ $(LDFLAGS)
 
 %.o: %.cpp %.h
