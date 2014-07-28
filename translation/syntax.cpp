@@ -346,4 +346,38 @@ InitDeclarator* Parser :: parseInitDeclarator() {
 	return ret;
 }
 
+void Parser :: c11Operators() {
+	this->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) StandardAssignment::create;
+	this->mInfix["*="] = (InfixOperator *(*)(Parser *, Expression *)) MultiplicationAssignment::create;
+	this->mInfix["/="] = (InfixOperator *(*)(Parser *, Expression *)) DivisionAssignment::create;
+	this->mInfix["%="] = (InfixOperator *(*)(Parser *, Expression *)) ModuloAssignment::create;
+	this->mInfix["+="] = (InfixOperator *(*)(Parser *, Expression *)) AdditionAssignment::create;
+	this->mInfix["-="] = (InfixOperator *(*)(Parser *, Expression *)) SubtractionAssignment::create;
+	this->mInfix["<<="] = (InfixOperator *(*)(Parser *, Expression *)) LeftShiftAssignment::create;
+	this->mInfix[">>="] = (InfixOperator *(*)(Parser *, Expression *)) RightShiftAssignment::create;
+	this->mInfix["&="] = (InfixOperator *(*)(Parser *, Expression *)) AddressAssignment::create;
+	this->mInfix["^="] = (InfixOperator *(*)(Parser *, Expression *)) XORAssignment::create;
+	this->mInfix["|="] = (InfixOperator *(*)(Parser *, Expression *)) ORAssignment::create;
+	this->mInfix["||"] = (InfixOperator *(*)(Parser *, Expression *)) LogicalOR::create;
+	this->mInfix["&&"] = (InfixOperator *(*)(Parser *, Expression *)) LogicalAND::create;
+	this->mInfix["|"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseOR::create;
+	this->mInfix["^"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseXOR::create;
+	this->mInfix["&"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseAND::create;
+	this->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;
+	this->mInfix["=="] = (InfixOperator *(*)(Parser *, Expression *)) Equality::create;
+	this->mInfix["!="] = (InfixOperator *(*)(Parser *, Expression *)) NonEquality::create;
+	this->mInfix["<"] = (InfixOperator *(*)(Parser *, Expression *)) LessThan::create;
+	this->mInfix[">"] = (InfixOperator *(*)(Parser *, Expression *)) GreaterThan::create;
+	this->mInfix["<="] = (InfixOperator *(*)(Parser *, Expression *)) LessThanOrEqual::create;
+	this->mInfix[">="] = (InfixOperator *(*)(Parser *, Expression *)) GreaterThanOrEqual::create;
+	this->mInfix["<<"] = (InfixOperator *(*)(Parser *, Expression *)) ShiftLeft::create;
+	this->mInfix[">>"] = (InfixOperator *(*)(Parser *, Expression *)) ShiftRight::create;
+	this->mInfix["+"] = (InfixOperator *(*)(Parser *, Expression *)) Addition::create;
+	this->mInfix["-"] = (InfixOperator *(*)(Parser *, Expression *)) Subtraction::create;
+	this->mInfix["*"] = (InfixOperator *(*)(Parser *, Expression *)) Multiplication::create;
+	this->mInfix["/"] = (InfixOperator *(*)(Parser *, Expression *)) Division::create;
+	this->mInfix["%"] = (InfixOperator *(*)(Parser *, Expression *)) Modulo::create;
+}
+
+
 

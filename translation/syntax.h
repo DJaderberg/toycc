@@ -115,8 +115,8 @@ class BinaryOperator : public InfixOperator {
 		}
 		void parse(Parser* parser);
 	private:
-		Op* rhs; //The right hand side 
-		Op* lhs; //The left hand side
+		Op* rhs = NULL; //The right hand side 
+		Op* lhs = NULL; //The left hand side
 };
 
 template<class Left, class Middle, class Right, const string* opStrFirst, const string* opStrSecond, PriorityEnum prioTemp>
@@ -147,9 +147,9 @@ class TernaryOperator : public InfixOperator {
 		}
 		void parse(Parser* parser);
 	private:
-		Left* lhs;
-		Middle* mhs;
-		Right* rhs;
+		Left* lhs = NULL;
+		Middle* mhs = NULL;
+		Right* rhs = NULL;
 };
 
 class TranslationUnit;
@@ -200,6 +200,7 @@ class Parser {
 		map<string, InfixOperator* (*) (Parser*, Expression*)> mInfix; 
 		//Maps string to pointer to function which returns type Expression* and
 		//takes types Parser*, Expression* as input
+		void c11Operators(); //Inserts operators to parse C11 into the maps
 	private:
 		BufferedSource<Token>* source;
 };
@@ -637,13 +638,84 @@ class BitwiseAND : public BinaryOperator<Expression, &BitwiseANDOpStr , BITWISE_
 	   	{return new BitwiseAND(parser, lhs);}
 };
 
+const string EqualityOpStr = "==";
+class Equality : public BinaryOperator<Expression, &EqualityOpStr, EQUALITY> {
+	public:
+		Equality(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static Equality* create(Parser* parser, Expression* lhs)\
+	   	{return new Equality(parser, lhs);}
+};
+
+const string NonEqualityOpStr = "!=";
+class NonEquality : public BinaryOperator<Expression, &NonEqualityOpStr, EQUALITY> {
+	public:
+		NonEquality(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static NonEquality* create(Parser* parser, Expression* lhs)\
+	   	{return new NonEquality(parser, lhs);}
+};
+
+const string LessThanOpStr = "<";
+class LessThan : public BinaryOperator<Expression, &LessThanOpStr, RELATIONAL> {
+	public:
+		LessThan(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static LessThan* create(Parser* parser, Expression* lhs)\
+	   	{return new LessThan(parser, lhs);}
+};
+
+const string GreaterThanOpStr = ">";
+class GreaterThan : public BinaryOperator<Expression, &GreaterThanOpStr, RELATIONAL> {
+	public:
+		GreaterThan(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static GreaterThan* create(Parser* parser, Expression* lhs)\
+	   	{return new GreaterThan(parser, lhs);}
+};
+
+const string LessThanOrEqualOpStr = "<=";
+class LessThanOrEqual : public BinaryOperator<Expression, &LessThanOrEqualOpStr, RELATIONAL> {
+	public:
+		LessThanOrEqual(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static LessThanOrEqual* create(Parser* parser, Expression* lhs)\
+	   	{return new LessThanOrEqual(parser, lhs);}
+};
+
+const string GreaterThanOrEqualOpStr = ">=";
+class GreaterThanOrEqual : public BinaryOperator<Expression, &GreaterThanOrEqualOpStr, RELATIONAL> {
+	public:
+		GreaterThanOrEqual(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static GreaterThanOrEqual* create(Parser* parser, Expression* lhs)\
+	   	{return new GreaterThanOrEqual(parser, lhs);}
+};
+
+const string ShiftLeftOpStr = "<<";
+class ShiftLeft : public BinaryOperator<Expression, &ShiftLeftOpStr, SHIFT> {
+	public:
+		ShiftLeft(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static ShiftLeft* create(Parser* parser, Expression* lhs)\
+	   	{return new ShiftLeft(parser, lhs);}
+};
+
+const string ShiftRightOpStr = ">>";
+class ShiftRight : public BinaryOperator<Expression, &ShiftRightOpStr, SHIFT> {
+	public:
+		ShiftRight(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static ShiftRight* create(Parser* parser, Expression* lhs)\
+	   	{return new ShiftRight(parser, lhs);}
+};
 
 const string AdditionOpStr = "+";
 class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 	public:
 		Addition(Parser* parser, Expression* lhs) \
 			: BinaryOperator(parser, lhs) {}
-		static BinaryOperator* create(Parser* parser, Expression* lhs) \
+		static Addition* create(Parser* parser, Expression* lhs) \
 		{return new Addition(parser, lhs);}
 };
 
@@ -652,7 +724,7 @@ class Subtraction : public BinaryOperator<Expression, &SubtractionOpStr, ADDITIV
 	public:
 		Subtraction(Parser* parser, Expression* lhs) \
 			: BinaryOperator(parser, lhs) {}
-		static BinaryOperator* create(Parser* parser, Expression* lhs) \
+		static Subtraction* create(Parser* parser, Expression* lhs) \
 		{return new Subtraction(parser, lhs);}
 };
 
@@ -661,8 +733,26 @@ class Multiplication : public BinaryOperator<Expression, &MultiplicationOpStr, M
 	public:
 		Multiplication(Parser* parser, Expression* lhs) \
 			: BinaryOperator(parser, lhs) {}
-		static BinaryOperator* create(Parser* parser, Expression* lhs) \
+		static Multiplication* create(Parser* parser, Expression* lhs) \
 		{return new Multiplication(parser, lhs);}
+};
+
+const string DivisionOpStr = "/";
+class Division : public BinaryOperator<Expression, &DivisionOpStr, MULTIPLICATIVE> {
+	public:
+		Division(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static Division* create(Parser* parser, Expression* lhs) \
+		{return new Division(parser, lhs);}
+};
+
+const string ModuloOpStr = "%";
+class Modulo : public BinaryOperator<Expression, &ModuloOpStr, MULTIPLICATIVE> {
+	public:
+		Modulo(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static Modulo* create(Parser* parser, Expression* lhs) \
+		{return new Modulo(parser, lhs);}
 };
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
