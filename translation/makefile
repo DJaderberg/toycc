@@ -1,7 +1,7 @@
 CC      = g++
 CFLAGS  = -Wall -Wextra -Werror -std=c++11
 LDFLAGS = 
-OBJECTS = translation.o preprocessing.o source.o syntaxTree.o
+OBJECTS = translation.o preprocessing.o source.o
 all: translation 
 
 translation: $(OBJECTS)

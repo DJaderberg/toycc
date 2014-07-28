@@ -151,7 +151,7 @@ PPToken Lexer :: get() {
 	PPToken testToken = this->matchComment();
 	testStr = testToken.getName();
 	if (testStr.length() > 0) {
-		key = OTHER;
+		key = WHITESPACE;
 		PPToken ppt= PPToken(0, 0, " ", key);
 		return ppt;
 	}
