@@ -54,9 +54,10 @@ int translate(string filename) {
 	BufferedSource<Token>* bufParserSource = new BufferedSource<Token>\
 											 (strlitconcat);
 	Parser* parser = new Parser(bufParserSource);
-	//Insert all the operators into the Parser
+	//Insert all the operators into the Parser maps
 	parser->mInfix["+"] = (InfixOperator *(*)(Parser *, Expression *)) Addition::create;
 	parser->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) Assignment::create;
+	parser->mInfix["*"] = (InfixOperator *(*)(Parser *, Expression *)) Multiplication::create;
 	//Parsing printing code
 	Expression* ptr = NULL;
 	while (true) {
@@ -68,6 +69,7 @@ int translate(string filename) {
 		} else {
 			cout << ptr->getName() << '\n';
 		}
+		parser->getSource()->clearUsed();
 	}
 		
 	//Tokenization printing code

@@ -208,6 +208,10 @@ JumpStatement* Parser :: parseJumpStatement() {
  * for attempting to explain Pratt parsers.
  */
 Expression* Parser :: parseExpression() {
+	return parseExpression(DEFAULT);
+}
+
+Expression* Parser :: parseExpression(PriorityEnum priority) {
 	/*Token token = source->get();
 	Expression* ptr = NULL;
 	if (token.getKey() == IDENTIFIER) {
@@ -225,7 +229,7 @@ Expression* Parser :: parseExpression() {
 		left = new IdentifierExpression(token);
 	} else if (searchPrefix != mPrefix.end()) {
 		//Found current token as prefix operator
-		left = searchPrefix->second(this, parseExpression());
+			left = searchPrefix->second(this, parseExpression(priority));
 	} else {
 		string err = "Could not parse '" + token.getName() + "'";
 	}
@@ -234,8 +238,21 @@ Expression* Parser :: parseExpression() {
 	auto searchInfix = mInfix.find(token.getName());
 	if (searchInfix != mInfix.end()) {
 		//Found current token as infix operator
-		source->get(); //Actually consume the peeked token
-		ret = searchInfix->second(this, left);
+		Expression* dummy = searchInfix->second(this, NULL);
+		//Reset buffer after unecessary parsing performed by the initializer of dummy
+		while (searchInfix != mInfix.end() && \
+				priority < dummy->getPriority()) {
+			source->get(); //Actually consume the peeked token
+			left = searchInfix->second(this, left);
+			left->parse(this);
+			token = source->peek();
+			if (token.getName() == ";") {break;}
+			searchInfix = mInfix.find(token.getName());
+			delete dummy;
+			dummy = searchInfix->second(this,NULL);
+		}
+		delete dummy;
+		ret = left;
 	} else {
 		//No infix here, so just return the prefix parsing
 		ret = left;

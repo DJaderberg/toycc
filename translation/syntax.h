@@ -1,9 +1,8 @@
 #include "source.h"
 
-const string AdditionOpStr = "+";
-enum PriorityEnum {PRIMARY, POSTFIX, UNARY, CAST, MULTIPLICATIVE, ADDITIVE,\
-	SHIFT, RELATIONAL, EQUALITY, BITWISE_AND, BITWISE_XOR, BITWISE_OR, \
-		LOGICAL_AND, LOGICAL_OR, CONDITIONAL, ASSIGNMENT};
+enum PriorityEnum {DEFAULT, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, LOGICAL_AND, \
+	BITWISE_OR, BITWISE_XOR, BITWISE_AND, EQUALITY, RELATIONAL, SHIFT, \
+		ADDITIVE, MULTIPLICATIVE, CAST, UNARY, POSTFIX, PRIMARY};
 class Parser;
 
 //! Abstract base class for all classes in the AST
@@ -41,21 +40,28 @@ class NodeList : public Node {
 };
 
 class Expression : public Node {
+	public:
+		Expression(PriorityEnum prio) : prio(prio) {}
+		PriorityEnum getPriority() {return prio;}
+		~Expression() {}
+		virtual void parse(Parser* parser) = 0; //Parse the rest of the 
+		//Expression, with the Parser starting at the Token following the first
+		//punctuator of the Expression. Unary expressions should not do anything
+	private:
+		PriorityEnum prio = DEFAULT;
 };
 
 class Operator : public Expression {
 	public:
 		Operator(Parser* parser, const string* opStr, PriorityEnum prio) \
-			: parser(parser), opStr(*opStr), prio(prio) {}
+			: Expression(prio), parser(parser), opStr(*opStr) {}
 		virtual ~Operator() {}
 		string getName() {return opStr;}
-		PriorityEnum getPriority() {return prio;}
 	protected:
 		Parser* parser;
 	private:
 		const string opStr; //String representation of the punctuator for this
 		//operator, e.g. "+" for Addition.
-		PriorityEnum prio; //Priority for this operator
 };
 
 template<class T>
@@ -70,6 +76,8 @@ class PrefixOperator : public Operator {
 			if (item != NULL) {ret += item->getName();}
 			return ret;
 		}
+		void parse(Parser* parser) {} //Do not do anything, 
+		//everything is already handled when the object is created
 	private:
 		T* item; //The item to operate on
 };
@@ -88,22 +96,24 @@ class BinaryOperator : public InfixOperator {
 			   	PriorityEnum prio) : Operator(opStr, prio), rhs(rhs), \
 									 lhs(lhs) {}*/
 		BinaryOperator(Parser* parser, Op* lhs) : \
-			InfixOperator(parser, opStrTemp, prioTemp), lhs(lhs) {
-				parseRhs(parser);
-			}
-		void parseRhs(Parser* parser);
+			InfixOperator(parser, opStrTemp, prioTemp), lhs(lhs) {}
 		virtual ~BinaryOperator() {
 			if (rhs != NULL) {delete rhs;}
 			if (lhs != NULL) {delete lhs;}
 		}
 		string getName() {
+			//TODO: Remove unnecessary parenthesis
 			string ret = "";
+			ret += "(";
 			if (lhs !=NULL) {ret += lhs->getName();}
+			ret += ")";
 			ret += Operator::getName();
+			ret += "(";
 			if (rhs !=NULL) {ret += rhs->getName();}
+			ret += ")";
 			return ret;
 		}
-		Expression* parse();
+		void parse(Parser* parser);
 	private:
 		Op* rhs; //The right hand side 
 		Op* lhs; //The left hand side
@@ -142,6 +152,7 @@ class Parser {
 		SelectionStatement* parseSelectionStatement();
 		JumpStatement* parseJumpStatement();
 		Expression* parseExpression();
+		Expression* parseExpression(PriorityEnum priority);
 		Identifier* parseIdentifier();
 		BlockItemList* parseBlockItemList();
 		BlockItem* parseBlockItem();
@@ -171,12 +182,15 @@ class Identifier : public Node {
 
 class IdentifierExpression : public Expression {
 	public:
-		IdentifierExpression(Token token) : identifier(new Identifier(token)) {}
-		IdentifierExpression(Identifier* identifier) : identifier(identifier) {}
+		IdentifierExpression(Token token) : Expression(PRIMARY), \
+											identifier(new Identifier(token)) {}
+		IdentifierExpression(Identifier* identifier) : Expression(PRIMARY), \
+													   identifier(identifier) {}
 		virtual ~IdentifierExpression() {
 			if (identifier != NULL) {delete identifier;}
 		}
 		string getName() {return identifier->getName();}
+		void parse(Parser* parser) {}
 	private:
 		Identifier* identifier = NULL;
 };
@@ -243,9 +257,12 @@ class ExpressionStatement : public Statement {
 	public:
 		ExpressionStatement(Expression* expr) : expression(expr)  {}
 		virtual ~ExpressionStatement() {delete expression;}
-		string getName() {return this->expression->getName() + ";";}
+		string getName() {
+			string ret = "";
+			if (expression != NULL) {return expression->getName();}
+			return ret + ";";}
 	private:
-		Expression* expression;
+		Expression* expression = NULL;
 };
 
 class SelectionStatement : public Statement {
@@ -410,6 +427,7 @@ class Assignment : public BinaryOperator<Expression, &AssignmentOpStr, ASSIGNMEN
 	   	{return new Assignment(parser, lhs);}
 };
 
+const string AdditionOpStr = "+";
 class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 	public:
 		Addition(Parser* parser, Expression* lhs) \
@@ -418,8 +436,17 @@ class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 		{return new Addition(parser, lhs);}
 };
 
+const string MultiplicationOpStr = "*";
+class Multiplication : public BinaryOperator<Expression, &MultiplicationOpStr, MULTIPLICATIVE> {
+	public:
+		Multiplication(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BinaryOperator* create(Parser* parser, Expression* lhs) \
+		{return new Multiplication(parser, lhs);}
+};
+
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
-void BinaryOperator<Op, opStrTemp, prioTemp>::parseRhs(Parser* parser) {
-	rhs = parser->parseExpression();
+void BinaryOperator<Op, opStrTemp, prioTemp>::parse(Parser* parser) {
+	rhs = parser->parseExpression(prioTemp);
 }
 
