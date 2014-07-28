@@ -518,7 +518,7 @@ void PostPPTokenizer :: initPunctuatorMap() {
 	this->punctuatorMap["!="] = "!=";
 	this->punctuatorMap["^"] = "^";
 	this->punctuatorMap["|"] = "|";
-	this->punctuatorMap["&"] = "&";
+	this->punctuatorMap["&&"] = "&&";
 	this->punctuatorMap["||"] = "||";
 	this->punctuatorMap["?"] = "?";
 	this->punctuatorMap[":"] = ":";
