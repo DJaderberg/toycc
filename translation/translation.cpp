@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
 		filename = argv[1];
 	} else {
 		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
-		filename = "/Users/David/toycc/test/expressionStatement.c"; //Parsing
+		filename = "/Users/David/toycc/test/expressions.c"; //Parsing
 	}
 	try {
 	return translate(filename);
@@ -55,14 +55,31 @@ int translate(string filename) {
 											 (strlitconcat);
 	Parser* parser = new Parser(bufParserSource);
 	//Insert all the operators into the Parser maps
+	parser->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) StandardAssignment::create;
+	parser->mInfix["*="] = (InfixOperator *(*)(Parser *, Expression *)) MultiplicationAssignment::create;
+	parser->mInfix["/="] = (InfixOperator *(*)(Parser *, Expression *)) DivisionAssignment::create;
+	parser->mInfix["%="] = (InfixOperator *(*)(Parser *, Expression *)) ModuloAssignment::create;
+	parser->mInfix["+="] = (InfixOperator *(*)(Parser *, Expression *)) AdditionAssignment::create;
+	parser->mInfix["-="] = (InfixOperator *(*)(Parser *, Expression *)) SubtractionAssignment::create;
+	parser->mInfix["<<="] = (InfixOperator *(*)(Parser *, Expression *)) LeftShiftAssignment::create;
+	parser->mInfix[">>="] = (InfixOperator *(*)(Parser *, Expression *)) RightShiftAssignment::create;
+	parser->mInfix["&="] = (InfixOperator *(*)(Parser *, Expression *)) AddressAssignment::create;
+	parser->mInfix["^="] = (InfixOperator *(*)(Parser *, Expression *)) XORAssignment::create;
+	parser->mInfix["|="] = (InfixOperator *(*)(Parser *, Expression *)) ORAssignment::create;
+	parser->mInfix["||"] = (InfixOperator *(*)(Parser *, Expression *)) LogicalOR::create;
+	parser->mInfix["&&"] = (InfixOperator *(*)(Parser *, Expression *)) LogicalAND::create;
+	parser->mInfix["|"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseOR::create;
+	parser->mInfix["^"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseXOR::create;
+	parser->mInfix["&"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseAND::create;
+	parser->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;
 	parser->mInfix["+"] = (InfixOperator *(*)(Parser *, Expression *)) Addition::create;
 	parser->mInfix["-"] = (InfixOperator *(*)(Parser *, Expression *)) Subtraction::create;
-	parser->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) Assignment::create;
 	parser->mInfix["*"] = (InfixOperator *(*)(Parser *, Expression *)) Multiplication::create;
 	//Parsing printing code
 	Expression* ptr = NULL;
 	while (true) {
 		ptr = NULL;
+		if (bufParserSource->empty()) {break;}
 		Statement* ptr = parser->parseStatement();
 		if (ptr == NULL) {
 			cout << "Could not parse expression" << '\n';

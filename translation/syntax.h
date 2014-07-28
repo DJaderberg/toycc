@@ -119,6 +119,39 @@ class BinaryOperator : public InfixOperator {
 		Op* lhs; //The left hand side
 };
 
+template<class Left, class Middle, class Right, const string* opStrFirst, const string* opStrSecond, PriorityEnum prioTemp>
+class TernaryOperator : public InfixOperator {
+	public:
+		TernaryOperator(Parser* parser, Left* lhs) : \
+			InfixOperator(parser, opStrFirst, prioTemp), lhs(lhs) {}
+		virtual ~TernaryOperator() {
+			if (lhs != NULL) {delete lhs;}
+			if (mhs != NULL) {delete mhs;}
+			if (rhs != NULL) {delete rhs;}
+		}
+		string getName() {
+			//TODO: Remove unnecessary paranthesis
+			string ret = "";
+			ret += "(";
+			if (lhs != NULL) {ret += lhs->getName();}
+			ret += ")";
+			ret += Operator::getName();
+			ret += "(";
+			if (mhs != NULL) {ret += mhs->getName();}
+			ret += ")";
+			ret += *opStrSecond;
+			ret += "(";
+			if (rhs != NULL) {ret += rhs->getName();}
+			ret += ")";
+			return ret;
+		}
+		void parse(Parser* parser);
+	private:
+		Left* lhs;
+		Middle* mhs;
+		Right* rhs;
+};
+
 class TranslationUnit;
 class ExternalDeclaration;
 class Statement;
@@ -180,6 +213,12 @@ class Identifier : public Node {
 		Token token;
 };
 
+class Keyword : public Identifier {
+	public:
+		Keyword(Token token) : Identifier(token) {}
+		virtual ~Keyword() {}
+};
+
 class IdentifierExpression : public Expression {
 	public:
 		IdentifierExpression(Token token) : Expression(PRIMARY), \
@@ -193,6 +232,21 @@ class IdentifierExpression : public Expression {
 		void parse(Parser* parser) {}
 	private:
 		Identifier* identifier = NULL;
+};
+
+class KeywordExpression : public Expression {
+	public:
+		KeywordExpression(Token token) : Expression(PRIMARY), \
+										 keyword(new Keyword(token)) {}
+		KeywordExpression(Keyword* keyword) : Expression(PRIMARY), \
+											  keyword(keyword) {}
+		virtual ~KeywordExpression() {
+			if (keyword != NULL) {delete keyword;}
+		}
+		string getName() {return keyword->getName();}
+		void parse(Parser* parser) {}
+	private:
+		Keyword* keyword = NULL;
 };
 
 class ExpressionException : public SyntaxException {
@@ -420,14 +474,169 @@ class DeclarationException : public SyntaxException {
 	DeclarationException(char *w) : SyntaxException(w) {}
 };
 
-const string AssignmentOpStr = "=";
-class Assignment : public BinaryOperator<Expression, &AssignmentOpStr, ASSIGNMENT> {
+//Operator classes, eg. Addition, Multiplication, etc.
+
+template<const string* opStrTemp>
+class Assignment : public BinaryOperator<Expression, opStrTemp, ASSIGNMENT> {
 	public:
 		Assignment(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs) {}
-		static BinaryOperator* create(Parser* parser, Expression* lhs)\
-	   	{return new Assignment(parser, lhs);}
+			: BinaryOperator<Expression, opStrTemp, ASSIGNMENT>(parser, lhs) {}
 };
+
+const string StandardAssignmentOpStr = "=";
+class StandardAssignment : public Assignment<&StandardAssignmentOpStr> {
+	public:
+		StandardAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static StandardAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new StandardAssignment(parser, lhs);}
+};
+
+const string MultiplicationAssignmentOpStr = "*=";
+class MultiplicationAssignment : public Assignment<&MultiplicationAssignmentOpStr> {
+	public:
+		MultiplicationAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static MultiplicationAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new MultiplicationAssignment(parser, lhs);}
+};
+
+const string DivisionAssignmentOpStr = "/=";
+class DivisionAssignment : public Assignment<&DivisionAssignmentOpStr> {
+	public:
+		DivisionAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static DivisionAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new DivisionAssignment(parser, lhs);}
+};
+
+const string ModuloAssignmentOpStr = "%=";
+class ModuloAssignment : public Assignment<&ModuloAssignmentOpStr> {
+	public:
+		ModuloAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static ModuloAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new ModuloAssignment(parser, lhs);}
+};
+
+const string AdditionAssignmentOpStr = "+=";
+class AdditionAssignment : public Assignment<&AdditionAssignmentOpStr> {
+	public:
+		AdditionAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static AdditionAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new AdditionAssignment(parser, lhs);}
+};
+
+const string SubtractionAssignmentOpStr = "-=";
+class SubtractionAssignment : public Assignment<&SubtractionAssignmentOpStr> {
+	public:
+		SubtractionAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static SubtractionAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new SubtractionAssignment(parser, lhs);}
+};
+
+const string LeftShiftAssignmentOpStr = "<<=";
+class LeftShiftAssignment : public Assignment<&LeftShiftAssignmentOpStr> {
+	public:
+		LeftShiftAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static LeftShiftAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new LeftShiftAssignment(parser, lhs);}
+};
+
+const string RightShiftAssignmentOpStr = ">>=";
+class RightShiftAssignment : public Assignment<&RightShiftAssignmentOpStr> {
+	public:
+		RightShiftAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static RightShiftAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new RightShiftAssignment(parser, lhs);}
+};
+
+const string AddressAssignmentOpStr = "&=";
+class AddressAssignment : public Assignment<&AddressAssignmentOpStr> {
+	public:
+		AddressAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static AddressAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new AddressAssignment(parser, lhs);}
+};
+
+const string XORAssignmentOpStr = "^=";
+class XORAssignment : public Assignment<&XORAssignmentOpStr> {
+	public:
+		XORAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static XORAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new XORAssignment(parser, lhs);}
+};
+
+const string ORAssignmentOpStr = "|=";
+class ORAssignment : public Assignment<&ORAssignmentOpStr> {
+	public:
+		ORAssignment(Parser* parser, Expression* lhs) \
+			: Assignment(parser, lhs) {}
+		static ORAssignment* create(Parser* parser, Expression* lhs)\
+	   	{return new ORAssignment(parser, lhs);}
+};
+
+const string ConditionalOpStr = "?";
+const string SecondConditionalOpStr = ":";
+class ConditionalExpression : public TernaryOperator<Expression, Expression, Expression, &ConditionalOpStr, &SecondConditionalOpStr, CONDITIONAL> {
+	public:
+		ConditionalExpression(Parser* parser, Expression* lhs) \
+			: TernaryOperator(parser, lhs) {}
+		static ConditionalExpression* create(Parser* parser, Expression* lhs) \
+		{return new ConditionalExpression(parser, lhs);}
+};
+
+const string LogicalOROpStr = "||";
+class LogicalOR : public BinaryOperator<Expression, &LogicalOROpStr, LOGICAL_OR> {
+	public:
+		LogicalOR(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static LogicalOR* create(Parser* parser, Expression* lhs)\
+	   	{return new LogicalOR(parser, lhs);}
+};
+
+const string LogicalANDOpStr = "&&";
+class LogicalAND : public BinaryOperator<Expression, &LogicalANDOpStr, LOGICAL_AND> {
+	public:
+		LogicalAND(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static LogicalAND* create(Parser* parser, Expression* lhs)\
+	   	{return new LogicalAND(parser, lhs);}
+};
+
+const string BitwiseOROpStr = "|";
+class BitwiseOR : public BinaryOperator<Expression, &BitwiseOROpStr, BITWISE_OR> {
+	public:
+		BitwiseOR(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BitwiseOR* create(Parser* parser, Expression* lhs)\
+	   	{return new BitwiseOR(parser, lhs);}
+};
+
+const string BitwiseXOROpStr = "^";
+class BitwiseXOR : public BinaryOperator<Expression, &BitwiseXOROpStr, BITWISE_XOR> {
+	public:
+		BitwiseXOR(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BitwiseXOR* create(Parser* parser, Expression* lhs)\
+	   	{return new BitwiseXOR(parser, lhs);}
+};
+
+const string BitwiseANDOpStr = "&";
+class BitwiseAND : public BinaryOperator<Expression, &BitwiseANDOpStr , BITWISE_AND> {
+	public:
+		BitwiseAND(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static BitwiseAND* create(Parser* parser, Expression* lhs)\
+	   	{return new BitwiseAND(parser, lhs);}
+};
+
 
 const string AdditionOpStr = "+";
 class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
@@ -459,5 +668,18 @@ class Multiplication : public BinaryOperator<Expression, &MultiplicationOpStr, M
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
 void BinaryOperator<Op, opStrTemp, prioTemp>::parse(Parser* parser) {
 	rhs = parser->parseExpression(prioTemp);
+}
+
+template<class Left, class Middle, class Right, const string* opStrFirst, const string* opStrSecond, PriorityEnum prioTemp>
+void TernaryOperator<Left, Middle, Right, opStrFirst, opStrSecond, prioTemp> :: parse(Parser* parser) {
+	mhs = parser->parseExpression(prioTemp);
+	Token secondOp = parser->getSource()->get();
+	if (secondOp.getName() == *opStrSecond) {
+		rhs = parser->parseExpression(prioTemp);
+	} else {
+		string err = "Expected '" + *opStrSecond + "' as second operator in ternary"\
+					  " operator";
+		throw new SyntaxException(err);
+	}
 }
 

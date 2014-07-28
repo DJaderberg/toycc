@@ -227,6 +227,8 @@ Expression* Parser :: parseExpression(PriorityEnum priority) {
 	Expression* left = NULL;
 	if (token.getKey() == IDENTIFIER) {
 		left = new IdentifierExpression(token);
+	} else if (token.getKey() == KEYWORD) {
+		left = new KeywordExpression(token);
 	} else if (searchPrefix != mPrefix.end()) {
 		//Found current token as prefix operator
 			left = searchPrefix->second(this, parseExpression(priority));
