@@ -212,26 +212,32 @@ Expression* Parser :: parseExpression() {
 }
 
 Expression* Parser :: parseExpression(PriorityEnum priority) {
-	/*Token token = source->get();
-	Expression* ptr = NULL;
-	if (token.getKey() == IDENTIFIER) {
-		ptr = new IdentifierExpression(token);
-	} else {
-		string err = "Expected identifier";
-		throw ExpressionException(err);
-	}
-	return ptr;*/
 	Expression* ret = NULL;
 	Token token = source->get();
 	auto searchPrefix = mPrefix.find(token.getName());
 	Expression* left = NULL;
-	if (token.getKey() == IDENTIFIER) {
-		left = new IdentifierExpression(token);
-	} else if (token.getKey() == KEYWORD) {
-		left = new KeywordExpression(token);
+	if (token.getName() == "(") {
+		if (source->peek().getKey() == KEYWORD) {
+			//Sould be a type cast
+			left = new TypeCast(this);
+			left->parse(this);
+		} else {
+			//Normal parenthesis, look for expression (DEFAULT priority) inside
+			left = parseExpression();
+			token = source->get();
+			if (token.getName() != ")") {
+				string err = "Expected ')'";
+				throw new SyntaxException(err);
+			}
+		}
 	} else if (searchPrefix != mPrefix.end()) {
 		//Found current token as prefix operator
-			left = searchPrefix->second(this, parseExpression(priority));
+			left = searchPrefix->second(this);
+			left->parse(this);
+	} else if (token.getKey() == KEYWORD) {
+		left = new KeywordExpression(token);
+	} else if (token.getKey() == IDENTIFIER) {
+		left = new IdentifierExpression(token);
 	} else {
 		string err = "Could not parse '" + token.getName() + "'";
 	}
@@ -347,6 +353,27 @@ InitDeclarator* Parser :: parseInitDeclarator() {
 }
 
 void Parser :: c11Operators() {
+	//Prefix
+	this->mPrefix["("] = (Operator *(*)(Parser *)) TypeCast::create; //Should never be used, since parenthesis are handled as a special case
+	this->mPrefix["+"] = (Operator* (*)(Parser*)) UnaryPlus::create;
+	this->mPrefix["-"] = (Operator* (*)(Parser*)) UnaryMinus::create;
+	this->mPrefix["&"] = (Operator* (*)(Parser*)) Reference::create;
+	this->mPrefix["*"] = (Operator* (*)(Parser*)) Indirection::create;
+	this->mPrefix["~"] = (Operator* (*)(Parser*)) BitwiseNOT::create;
+	this->mPrefix["!"] = (Operator* (*)(Parser*)) LogicalNOT::create;
+	this->mPrefix["++"] = (Operator* (*)(Parser*)) IncrementPrefix::create;
+	this->mPrefix["--"] = (Operator* (*)(Parser*)) DecrementPrefix::create;
+	this->mPrefix["sizeof"] = (Operator* (*)(Parser*)) Sizeof::create;
+	this->mPrefix["_Alignof"] = (Operator* (*)(Parser*)) Alignof::create;
+		
+	//Postfix
+	this->mInfix["++"] = (InfixOperator* (*)(Parser*, Expression*)) IncrementPostfix::create;
+	this->mInfix["--"] = (InfixOperator* (*)(Parser*, Expression*)) DecrementPostfix::create;
+	this->mInfix["->"] = (InfixOperator* (*)(Parser*, Expression*)) StructureDereference::create;
+	this->mInfix["."] = (InfixOperator* (*)(Parser*, Expression*)) StructureReference::create;
+	
+	
+	//Binary
 	this->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) StandardAssignment::create;
 	this->mInfix["*="] = (InfixOperator *(*)(Parser *, Expression *)) MultiplicationAssignment::create;
 	this->mInfix["/="] = (InfixOperator *(*)(Parser *, Expression *)) DivisionAssignment::create;
@@ -363,7 +390,6 @@ void Parser :: c11Operators() {
 	this->mInfix["|"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseOR::create;
 	this->mInfix["^"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseXOR::create;
 	this->mInfix["&"] = (InfixOperator *(*)(Parser *, Expression *)) BitwiseAND::create;
-	this->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;
 	this->mInfix["=="] = (InfixOperator *(*)(Parser *, Expression *)) Equality::create;
 	this->mInfix["!="] = (InfixOperator *(*)(Parser *, Expression *)) NonEquality::create;
 	this->mInfix["<"] = (InfixOperator *(*)(Parser *, Expression *)) LessThan::create;
@@ -377,6 +403,9 @@ void Parser :: c11Operators() {
 	this->mInfix["*"] = (InfixOperator *(*)(Parser *, Expression *)) Multiplication::create;
 	this->mInfix["/"] = (InfixOperator *(*)(Parser *, Expression *)) Division::create;
 	this->mInfix["%"] = (InfixOperator *(*)(Parser *, Expression *)) Modulo::create;
+	
+	//Ternary
+	this->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;
 }
 
 

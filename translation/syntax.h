@@ -64,22 +64,21 @@ class Operator : public Expression {
 		//operator, e.g. "+" for Addition.
 };
 
-template<class T>
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
 class PrefixOperator : public Operator {
 	public:
-		PrefixOperator(Parser* parser, const string* opStr, PriorityEnum prio) \
-			: Operator(parser, opStr, prio), item(item) {}
-		virtual ~PrefixOperator() {delete item;}
+		PrefixOperator(Parser* parser) \
+			: Operator(parser, opStrTemp, prioTemp) {}
+		virtual ~PrefixOperator() {delete expr;}
 		string getName() {
 			string ret = "";
 			ret += Operator::getName();
-			if (item != NULL) {ret += item->getName();}
+			if (expr != NULL) {ret += expr->getName();}
 			return ret;
 		}
-		void parse(Parser* parser) {} //Do not do anything, 
-		//everything is already handled when the object is created
+		void parse(Parser* parser);
 	private:
-		T* item; //The item to operate on
+		Op* expr = NULL; //The item to operate on
 };
 
 class InfixOperator : public Operator {
@@ -87,6 +86,23 @@ class InfixOperator : public Operator {
 		InfixOperator(Parser* parser, const string* opStr, PriorityEnum prio) \
 			: Operator(parser, opStr, prio) {}
 		virtual ~InfixOperator() {}
+};
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+class PostfixOperator : public InfixOperator {
+	public:
+		PostfixOperator(Parser* parser, Expression* expr) \
+			: InfixOperator(parser, opStrTemp, prioTemp), expr(expr) {}
+		virtual ~PostfixOperator() {}
+		string getName() {
+			string ret = "";
+			if (expr != NULL) {ret += expr->getName();}
+			ret += Operator::getName();
+			return ret;
+		}
+		void parse(Parser* parser);
+	private:
+		Op* expr = NULL;
 };
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
@@ -104,13 +120,25 @@ class BinaryOperator : public InfixOperator {
 		string getName() {
 			//TODO: Remove unnecessary parenthesis
 			string ret = "";
-			ret += "(";
-			if (lhs !=NULL) {ret += lhs->getName();}
-			ret += ")";
+			if (lhs !=NULL) {
+				if (this->getPriority() < lhs->getPriority()) {
+					ret += lhs->getName();
+				} else {
+					ret += "(";
+					ret += lhs->getName();
+					ret += ")";
+				}
+			}
 			ret += Operator::getName();
-			ret += "(";
-			if (rhs !=NULL) {ret += rhs->getName();}
-			ret += ")";
+			if (rhs !=NULL) {
+				if (this->getPriority() < rhs->getPriority()) {
+					ret += rhs->getName();
+				} else {
+					ret += "(";
+					ret += rhs->getName();
+					ret += ")";
+				}
+			}
 			return ret;
 		}
 		void parse(Parser* parser);
@@ -130,19 +158,37 @@ class TernaryOperator : public InfixOperator {
 			if (rhs != NULL) {delete rhs;}
 		}
 		string getName() {
-			//TODO: Remove unnecessary paranthesis
+			//TODO: Remove unnecessary parenthesis
 			string ret = "";
-			ret += "(";
-			if (lhs != NULL) {ret += lhs->getName();}
-			ret += ")";
+			if (lhs != NULL) {
+				if (this->getPriority() < lhs->getPriority()) {
+					ret += lhs->getName();
+				} else {
+					ret += "(";
+					ret += lhs->getName();
+					ret += ")";
+				}
+			}
 			ret += Operator::getName();
-			ret += "(";
-			if (mhs != NULL) {ret += mhs->getName();}
-			ret += ")";
+			if (mhs != NULL) {
+				if (this->getPriority() < mhs->getPriority()) {
+					ret += mhs->getName();
+				} else {
+					ret += "(";
+					ret += mhs->getName();
+					ret += ")";
+				}
+			}
 			ret += *opStrSecond;
-			ret += "(";
-			if (rhs != NULL) {ret += rhs->getName();}
-			ret += ")";
+			if (rhs != NULL) {
+				if (this->getPriority() < rhs->getPriority()) {
+					ret += rhs->getName();
+				} else {
+					ret += "(";
+					ret += rhs->getName();
+					ret += ")";
+				}
+			}
 			return ret;
 		}
 		void parse(Parser* parser);
@@ -194,7 +240,7 @@ class Parser {
 		InitDeclarator* parseInitDeclarator();
 		InitDeclaratorList* parseInitDeclaratorList();
 		Declaration* parseDeclaration();
-		map<string, PrefixOperator<Expression>* (*) (Parser*, Expression*)> mPrefix; 
+		map<string, Operator* (*) (Parser*)> mPrefix; 
 		//Maps string to pointer to function which returns type Expression* and
 		//takes types Parser*, Expression* as input
 		map<string, InfixOperator* (*) (Parser*, Expression*)> mInfix; 
@@ -754,6 +800,273 @@ class Modulo : public BinaryOperator<Expression, &ModuloOpStr, MULTIPLICATIVE> {
 		static Modulo* create(Parser* parser, Expression* lhs) \
 		{return new Modulo(parser, lhs);}
 };
+
+const string TypeCastOpStr = "(";
+class TypeCast : public PrefixOperator<Expression, &TypeCastOpStr, CAST> {
+	public:
+		TypeCast(Parser* parser) \
+			: PrefixOperator(parser) {}
+		static TypeCast* create(Parser* parser) \
+		{return new TypeCast(parser);}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->get();
+			if (token.getKey() != KEYWORD) {
+				string err = "Exprected type name in type cast";
+			} else {
+				typeName = token;
+			}
+			token = parser->getSource()->get();
+			if (token.getName() != ")") {
+				string err = "Expected ')' after TypeCast";
+				throw new SyntaxException(err);
+			}
+			PrefixOperator::parse(parser); //Normal prefixOp parsing
+		}
+		string getName() {
+			string	ret = "";
+			ret += PrefixOperator::getName();
+			ret = ret.substr(1);
+			ret = "(" + typeName.getName() + ")" + ret;
+			return ret;
+		}
+	private:
+		Token typeName; //Name of the type to convert to
+};
+
+const string UnaryPlusOpStr = "+";
+//Performs integer promotion in C
+class UnaryPlus : public PrefixOperator<Expression, &UnaryPlusOpStr, CAST> {
+	public:
+		UnaryPlus(Parser* parser) : PrefixOperator(parser) {}
+		static UnaryPlus* create(Parser* parser) {
+			return new UnaryPlus(parser);
+		}
+};
+
+const string UnaryMinusOpStr = "-";
+class UnaryMinus : public PrefixOperator<Expression, &UnaryMinusOpStr, CAST> {
+	public:
+		UnaryMinus(Parser* parser) : PrefixOperator(parser) {}
+		static UnaryMinus* create(Parser* parser) {
+			return new UnaryMinus(parser);
+		}
+};
+
+const string ReferenceOpStr = "&";
+class Reference : public PrefixOperator<Expression, &ReferenceOpStr, CAST> {
+	public:
+		Reference(Parser* parser) : PrefixOperator(parser) {}
+		static Reference* create(Parser* parser) {
+			return new Reference(parser);
+		}
+};
+
+const string IndirectionOpStr = "*";
+class Indirection : public PrefixOperator<Expression, &IndirectionOpStr, CAST> {
+	public:
+		Indirection(Parser* parser) : PrefixOperator(parser) {}
+		static Indirection* create(Parser* parser) {
+			return new Indirection(parser);
+		}
+};
+
+const string BitwiseNOTOpStr = "~";
+class BitwiseNOT : public PrefixOperator<Expression, &BitwiseNOTOpStr, CAST> {
+	public:
+		BitwiseNOT(Parser* parser) : PrefixOperator(parser) {}
+		static BitwiseNOT* create(Parser* parser) {
+			return new BitwiseNOT(parser);
+		}
+};
+
+const string LogicalNOTOpStr = "!";
+class LogicalNOT : public PrefixOperator<Expression, &LogicalNOTOpStr, CAST> {
+	public:
+		LogicalNOT(Parser* parser) : PrefixOperator(parser) {}
+		static LogicalNOT* create(Parser* parser) {
+			return new LogicalNOT(parser);
+		}
+};
+
+const string IncrementPrefixOpStr = "++";
+class IncrementPrefix : public PrefixOperator<Expression, &IncrementPrefixOpStr, UNARY> {
+	public:
+		IncrementPrefix(Parser* parser) : PrefixOperator(parser) {}
+		static IncrementPrefix* create(Parser* parser) {
+			return new IncrementPrefix(parser);
+		}
+};
+
+const string DecrementPrefixOpStr = "--";
+class DecrementPrefix : public PrefixOperator<Expression, &DecrementPrefixOpStr, UNARY> {
+	public:
+		DecrementPrefix(Parser* parser) : PrefixOperator(parser) {}
+		static DecrementPrefix* create(Parser* parser) {
+			return new DecrementPrefix(parser);
+		}
+};
+
+const string SizeofOpStr = "sizeof";
+class Sizeof : public PrefixOperator<Expression, &SizeofOpStr, UNARY> {
+	public:
+		Sizeof(Parser* parser) : PrefixOperator(parser) {}
+		static Sizeof* create(Parser* parser) {
+			return new Sizeof(parser);
+		}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->peek();
+			if (token.getName() == "(") {
+				parser->getSource()->get(); //Actually get "(" token
+				token = parser->getSource()->get();
+				if (token.getKey() == KEYWORD || token.getKey() == IDENTIFIER) {
+					//IDENTIFIER for used defined types
+					type = token;
+					token = parser->getSource()->get();
+					if (token.getName() != ")") {
+						string err = "Expected ')' in sizeof";
+						throw new SyntaxException(err);
+					}
+				} else {
+					string err = "Expected type name in sizeof(...)";
+					throw new SyntaxException(err);
+				}
+			} else {
+				expr = parser->parseExpression(UNARY);
+			}
+		}
+		string getName() {
+			string ret = "sizeof";
+			if (expr != NULL) {
+				ret += " " + expr->getName();
+			} else {
+				ret += "(" + type.getName() + ")";
+			}
+			return ret;
+		}
+	private:
+		Token type;
+		Expression* expr = NULL;
+};
+
+const string AlignofOpStr= "_Alignof";
+class Alignof: public PrefixOperator<Expression, &SizeofOpStr, UNARY> {
+	public:
+		Alignof(Parser* parser) : PrefixOperator(parser) {}
+		static Alignof* create(Parser* parser) {
+			return new Alignof(parser);
+		}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->peek();
+			if (token.getName() == "(") {
+				parser->getSource()->get(); //Actually get "(" token
+				token = parser->getSource()->get();
+				if (token.getKey() == KEYWORD || token.getKey() == IDENTIFIER) {
+					//IDENTIFIER for used defined types
+					type = token;
+					token = parser->getSource()->get();
+					if (token.getName() != ")") {
+						string err = "Expected ')' in _Alignof";
+						throw new SyntaxException(err);
+					}
+				} else {
+					string err = "Expected type name in _Alignof(...)";
+					throw new SyntaxException(err);
+				}
+			} else {
+				string err = "Expected '(' after '_Alignof'";
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			string ret = "_Alignof";
+			if (expr != NULL) {
+				ret += " " + expr->getName();
+			} else {
+				ret += "(" + type.getName() + ")";
+			}
+			return ret;
+		}
+	private:
+		Token type;
+		Expression* expr = NULL;
+};
+
+const string IncrementPostfixOpStr = "++";
+class IncrementPostfix : public PostfixOperator<Expression, &IncrementPostfixOpStr, POSTFIX> {
+	public:
+		IncrementPostfix(Parser* parser, Expression* expr) : PostfixOperator(parser, expr) {}
+		static IncrementPostfix* create(Parser* parser, Expression* expr) {
+			return new IncrementPostfix(parser, expr);
+		}
+};
+
+const string DecrementPostfixOpStr = "--";
+class DecrementPostfix : public PostfixOperator<Expression, &DecrementPostfixOpStr, POSTFIX> {
+	public:
+		DecrementPostfix(Parser* parser, Expression* expr) : PostfixOperator(parser, expr) {}
+		static DecrementPostfix* create(Parser* parser, Expression* expr) {
+			return new DecrementPostfix(parser, expr);
+		}
+};
+
+const string StructureDereferenceOpStr = "->";
+class StructureDereference : public PostfixOperator<Expression, &StructureDereferenceOpStr, POSTFIX> {
+	public:
+		StructureDereference(Parser* parser, Expression* expr) : PostfixOperator(parser, expr) {}
+		static StructureDereference* create(Parser* parser, Expression* expr) {
+			return new StructureDereference(parser, expr);
+		}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->get();
+			if (token.getKey() == IDENTIFIER) {
+				id = token;
+			} else {
+				string err = "Expected identifier after '->'";
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			string ret = PostfixOperator::getName();
+			ret += id.getName();
+			return ret;
+		}
+	private:
+		Token id;
+};
+
+const string StructureReferenceOpStr = ".";
+class StructureReference : public PostfixOperator<Expression, &StructureReferenceOpStr, POSTFIX> {
+	public:
+		StructureReference(Parser* parser, Expression* expr) : PostfixOperator(parser, expr) {}
+		static StructureReference* create(Parser* parser, Expression* expr) {
+			return new StructureReference(parser, expr);
+		}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->get();
+			if (token.getKey() == IDENTIFIER) {
+				id = token;
+			} else {
+				string err = "Expected identifier after '->'";
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			string ret = PostfixOperator::getName();
+			ret += id.getName();
+			return ret;
+		}
+	private:
+		Token id;
+};
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+void PrefixOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
+	expr = parser->parseExpression(prioTemp);
+}
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+void PostfixOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
+}
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
 void BinaryOperator<Op, opStrTemp, prioTemp>::parse(Parser* parser) {
