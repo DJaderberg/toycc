@@ -222,7 +222,8 @@ PPToken Lexer :: get() {
 PPToken Lexer :: matchPPNumber() {
 	string str = "";
 	char current = source.get();
-	if (isdigit(current) || current == '.') {
+	if (isdigit(current)) { //should maybe (include || current == '.'), but that is
+		//currently removed to make sure that struct access, a.b, works
 		str += current;
 		current = source.get();
 		while (isalnum(current) || current == '.') {
