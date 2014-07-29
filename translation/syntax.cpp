@@ -374,6 +374,7 @@ void Parser :: c11Operators() {
 	
 	
 	//Binary
+	this->mInfix[","] = (InfixOperator* (*)(Parser*, Expression*)) Comma::create;
 	this->mInfix["="] = (InfixOperator *(*)(Parser *, Expression *)) StandardAssignment::create;
 	this->mInfix["*="] = (InfixOperator *(*)(Parser *, Expression *)) MultiplicationAssignment::create;
 	this->mInfix["/="] = (InfixOperator *(*)(Parser *, Expression *)) DivisionAssignment::create;

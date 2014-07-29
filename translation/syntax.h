@@ -1,8 +1,8 @@
 #include "source.h"
 
-enum PriorityEnum {DEFAULT, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, LOGICAL_AND, \
-	BITWISE_OR, BITWISE_XOR, BITWISE_AND, EQUALITY, RELATIONAL, SHIFT, \
-		ADDITIVE, MULTIPLICATIVE, CAST, UNARY, POSTFIX, PRIMARY};
+enum PriorityEnum {DEFAULT, COMMA, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, \
+	LOGICAL_AND, BITWISE_OR, BITWISE_XOR, BITWISE_AND, EQUALITY, RELATIONAL, \
+		SHIFT, ADDITIVE, MULTIPLICATIVE, CAST, UNARY, POSTFIX, PRIMARY};
 class Parser;
 
 //! Abstract base class for all classes in the AST
@@ -521,7 +521,20 @@ class DeclarationException : public SyntaxException {
 	DeclarationException(char *w) : SyntaxException(w) {}
 };
 
+
+
+
+
 //Operator classes, eg. Addition, Multiplication, etc.
+
+const string commaOpStr = ",";
+class Comma : public BinaryOperator<Expression, &commaOpStr, COMMA> {
+	public:
+		Comma(Parser* parser, Expression* lhs) \
+			: BinaryOperator<Expression, &commaOpStr, COMMA>(parser, lhs) {}
+		static Comma* create(Parser* parser, Expression* lhs)\
+	   	{return new Comma(parser, lhs);}
+};
 
 template<const string* opStrTemp>
 class Assignment : public BinaryOperator<Expression, opStrTemp, ASSIGNMENT> {
