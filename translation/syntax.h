@@ -266,6 +266,12 @@ class Keyword : public Identifier {
 		virtual ~Keyword() {}
 };
 
+class Constant : public Identifier {
+	public:
+		Constant(Token token) : Identifier(token) {}
+		virtual ~Constant() {}
+};
+
 class IdentifierExpression : public Expression {
 	public:
 		IdentifierExpression(Token token) : Expression(PRIMARY), \
@@ -294,6 +300,21 @@ class KeywordExpression : public Expression {
 		void parse(Parser* parser) {}
 	private:
 		Keyword* keyword = NULL;
+};
+
+class ConstantExpression : public Expression {
+	public:
+		ConstantExpression(Token token) : Expression(PRIMARY), \
+										 constant(new Constant(token)) {}
+		ConstantExpression(Constant* constant) : Expression(PRIMARY), \
+											  constant(constant) {}
+		virtual ~ConstantExpression() {
+			if (constant != NULL) {delete constant;}
+		}
+		string getName() {return constant->getName();}
+		void parse(Parser* parser) {}
+	private:
+		Constant* constant = NULL;
 };
 
 class ExpressionException : public SyntaxException {

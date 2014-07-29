@@ -238,6 +238,8 @@ Expression* Parser :: parseExpression(PriorityEnum priority) {
 		left = new KeywordExpression(token);
 	} else if (token.getKey() == IDENTIFIER) {
 		left = new IdentifierExpression(token);
+	} else if (token.getKey() == CONSTANT) {
+		left = new ConstantExpression(token);
 	} else {
 		string err = "Could not parse '" + token.getName() + "'";
 	}

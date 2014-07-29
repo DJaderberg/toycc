@@ -46,6 +46,7 @@ a->b;
 a.b;
 a[b];
 func(a, b);
+1.2;
 
 paren = (a + b) * c;
 
