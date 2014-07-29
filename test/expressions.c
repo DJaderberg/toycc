@@ -45,5 +45,7 @@ a++;
 a--;
 a->b;
 a.b;
+a[b];
+
 paren = (a + b) * c;
 

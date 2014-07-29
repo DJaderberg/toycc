@@ -404,6 +404,7 @@ void Parser :: c11Operators() {
 	this->mInfix["*"] = (InfixOperator *(*)(Parser *, Expression *)) Multiplication::create;
 	this->mInfix["/"] = (InfixOperator *(*)(Parser *, Expression *)) Division::create;
 	this->mInfix["%"] = (InfixOperator *(*)(Parser *, Expression *)) Modulo::create;
+	this->mInfix["["] = (InfixOperator *(*)(Parser *, Expression *)) ArraySubscript::create;
 	
 	//Ternary
 	this->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;

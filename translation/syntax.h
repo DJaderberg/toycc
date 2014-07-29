@@ -101,7 +101,7 @@ class PostfixOperator : public InfixOperator {
 			return ret;
 		}
 		void parse(Parser* parser);
-	private:
+	protected:
 		Op* expr = NULL;
 };
 
@@ -142,7 +142,7 @@ class BinaryOperator : public InfixOperator {
 			return ret;
 		}
 		void parse(Parser* parser);
-	private:
+	protected:
 		Op* rhs = NULL; //The right hand side 
 		Op* lhs = NULL; //The left hand side
 };
@@ -192,7 +192,7 @@ class TernaryOperator : public InfixOperator {
 			return ret;
 		}
 		void parse(Parser* parser);
-	private:
+	protected:
 		Left* lhs = NULL;
 		Middle* mhs = NULL;
 		Right* rhs = NULL;
@@ -1071,6 +1071,31 @@ class StructureReference : public PostfixOperator<Expression, &StructureReferenc
 	private:
 		Token id;
 };
+
+const string ArraySubscriptOpStr = "[";
+class ArraySubscript : public BinaryOperator<Expression, &ArraySubscriptOpStr, POSTFIX> {
+	public:
+		ArraySubscript(Parser* parser, Expression* lhs) \
+			: BinaryOperator(parser, lhs) {}
+		static ArraySubscript* create(Parser* parser, Expression* lhs)\
+	   	{return new ArraySubscript(parser, lhs);}
+		void parse(Parser* parser) {
+			rhs = parser->parseExpression(); //This is done with 
+			//DEFAULT priority, the brackets are like a pair of parenthesis
+			Token token = parser->getSource()->get();
+			if (token.getName() != "]") {
+				string err = "Expected ']'";
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			return BinaryOperator::getName() + "]";
+		}
+};
+
+
+
+
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
 void PrefixOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
