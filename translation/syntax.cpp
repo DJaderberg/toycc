@@ -354,7 +354,6 @@ InitDeclarator* Parser :: parseInitDeclarator() {
 
 void Parser :: c11Operators() {
 	//Prefix
-	this->mPrefix["("] = (Operator *(*)(Parser *)) TypeCast::create; //Should never be used, since parenthesis are handled as a special case
 	this->mPrefix["+"] = (Operator* (*)(Parser*)) UnaryPlus::create;
 	this->mPrefix["-"] = (Operator* (*)(Parser*)) UnaryMinus::create;
 	this->mPrefix["&"] = (Operator* (*)(Parser*)) Reference::create;
@@ -405,6 +404,7 @@ void Parser :: c11Operators() {
 	this->mInfix["/"] = (InfixOperator *(*)(Parser *, Expression *)) Division::create;
 	this->mInfix["%"] = (InfixOperator *(*)(Parser *, Expression *)) Modulo::create;
 	this->mInfix["["] = (InfixOperator *(*)(Parser *, Expression *)) ArraySubscript::create;
+	this->mInfix["("] = (InfixOperator *(*)(Parser *,Expression*)) FunctionCall::create; //This is for function calls, type casts are handled specially along with parenthesis
 	
 	//Ternary
 	this->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;

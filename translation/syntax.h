@@ -1093,6 +1093,39 @@ class ArraySubscript : public BinaryOperator<Expression, &ArraySubscriptOpStr, P
 		}
 };
 
+const string FunctionCallOpStr = "(";
+class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTFIX> {
+	public:
+		FunctionCall(Parser* parser, Expression* lhs) : \
+			BinaryOperator(parser, lhs) {}
+		static FunctionCall* create(Parser* parser, Expression* lhs) \
+		{return new FunctionCall(parser, lhs);}
+		void parse(Parser* parser) {
+			rhs = parser->parseExpression(); //With DEFAULT priority, since we're in a
+			//pair of parenthesis
+			Token token = parser->getSource()->get();
+			if (token.getName() != ")") {
+				string err = "Expected ')' at end of function ";
+				if (lhs != NULL) {err += lhs->getName();}
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			if (rhs->getPriority() > POSTFIX) {
+				return BinaryOperator::getName() + ")";
+			} else {
+				string ret =  "";
+				if (lhs != NULL) {ret += lhs->getName();}
+				ret += "(";
+				if (rhs != NULL) {ret += rhs->getName();}
+				ret += ")";
+				return ret;
+			}
+		}
+};
+
+
+
 
 
 

@@ -1,4 +1,3 @@
-a, b;
 sum = a + b; //Comment
 mult *= a - b;
 div /= a - b;
@@ -46,6 +45,7 @@ a--;
 a->b;
 a.b;
 a[b];
+func(a, b);
 
 paren = (a + b) * c;
 
