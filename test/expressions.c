@@ -47,6 +47,8 @@ a.b;
 a[b];
 func(a, b);
 1.2;
+"I am a string";
+_Generic(a=b, default : a=b);
 
 paren = (a + b) * c;
 

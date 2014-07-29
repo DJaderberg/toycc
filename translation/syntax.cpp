@@ -240,6 +240,8 @@ Expression* Parser :: parseExpression(PriorityEnum priority) {
 		left = new IdentifierExpression(token);
 	} else if (token.getKey() == CONSTANT) {
 		left = new ConstantExpression(token);
+	} else if (token.getKey() == STRINGLITERAL) {
+		left = new StringLiteralExpression(token);
 	} else {
 		string err = "Could not parse '" + token.getName() + "'";
 	}
@@ -366,6 +368,7 @@ void Parser :: c11Operators() {
 	this->mPrefix["--"] = (Operator* (*)(Parser*)) DecrementPrefix::create;
 	this->mPrefix["sizeof"] = (Operator* (*)(Parser*)) Sizeof::create;
 	this->mPrefix["_Alignof"] = (Operator* (*)(Parser*)) Alignof::create;
+	this->mPrefix["_Generic"] = (Operator* (*)(Parser*)) Generic::create;
 		
 	//Postfix
 	this->mInfix["++"] = (InfixOperator* (*)(Parser*, Expression*)) IncrementPostfix::create;

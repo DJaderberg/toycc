@@ -34,6 +34,7 @@ class NodeList : public Node {
 			if (next != NULL) {delete next;}
 			delete item;
 		}
+		void setNext(NodeList* n) {next = n;}
 	private:
 		T* item;
 		NodeList* next = NULL; //Optional, might be NULL
@@ -43,7 +44,7 @@ class Expression : public Node {
 	public:
 		Expression(PriorityEnum prio) : prio(prio) {}
 		PriorityEnum getPriority() {return prio;}
-		~Expression() {}
+		virtual ~Expression() {}
 		virtual void parse(Parser* parser) = 0; //Parse the rest of the 
 		//Expression, with the Parser starting at the Token following the first
 		//punctuator of the Expression. Unary expressions should not do anything
@@ -217,6 +218,8 @@ class Initializer;
 class Pointer;
 class Expression;
 class IdentifierExpression;
+class GenericAssociationList;
+class GenericAssociation;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -272,6 +275,12 @@ class Constant : public Identifier {
 		virtual ~Constant() {}
 };
 
+class StringLiteral : public Identifier {
+	public:
+		StringLiteral(Token token) : Identifier(token) {}
+		virtual ~StringLiteral() {}
+};
+
 class IdentifierExpression : public Expression {
 	public:
 		IdentifierExpression(Token token) : Expression(PRIMARY), \
@@ -315,6 +324,21 @@ class ConstantExpression : public Expression {
 		void parse(Parser* parser) {}
 	private:
 		Constant* constant = NULL;
+};
+
+class StringLiteralExpression : public Expression {
+	public:
+		StringLiteralExpression(Token token) : Expression(PRIMARY), \
+										 stringliteral(new StringLiteral(token)) {}
+		StringLiteralExpression(StringLiteral* stringliteral) : Expression(PRIMARY), \
+											  stringliteral(stringliteral) {}
+		virtual ~StringLiteralExpression() {
+			if (stringliteral != NULL) {delete stringliteral;}
+		}
+		string getName() {return stringliteral->getName();}
+		void parse(Parser* parser) {}
+	private:
+		StringLiteral* stringliteral = NULL;
 };
 
 class ExpressionException : public SyntaxException {
@@ -953,7 +977,7 @@ class Sizeof : public PrefixOperator<Expression, &SizeofOpStr, UNARY> {
 				parser->getSource()->get(); //Actually get "(" token
 				token = parser->getSource()->get();
 				if (token.getKey() == KEYWORD || token.getKey() == IDENTIFIER) {
-					//IDENTIFIER for used defined types
+					//IDENTIFIER for user defined types
 					type = token;
 					token = parser->getSource()->get();
 					if (token.getName() != ")") {
@@ -1144,6 +1168,93 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 			}
 		}
 };
+
+class GenericAssociation : public Expression {
+	public:
+		GenericAssociation(Token type) : Expression(PRIMARY), type(type) {}
+		~GenericAssociation() {delete assignmentExpr;}
+		string getName() {
+			string ret = type.getName() + " : ";
+			if (assignmentExpr != NULL) {ret += assignmentExpr->getName();}
+			return ret;
+		}
+		void parse(Parser* parser) {
+			Token colon = parser->getSource()->get();
+			if (colon.getName() != ":") {
+				string err = "Expected ':' in generic association";
+			}
+			assignmentExpr = parser->parseExpression(COMMA);
+		}
+	private:
+		Token type;
+		Expression* assignmentExpr = NULL;
+};
+
+class GenericAssociationList : public NodeList<GenericAssociation> {
+	public:
+		GenericAssociationList(GenericAssociation* assoc) : NodeList(assoc) {}
+		GenericAssociationList(GenericAssociation* assoc, GenericAssociationList* list) : NodeList(assoc, list) {}
+};
+
+const string GenericOpStr = "_Generic";
+class Generic : public PrefixOperator<Expression, &GenericOpStr, UNARY> {
+	public:
+		Generic(Parser* parser) : PrefixOperator(parser) {}
+		static Generic* create(Parser* parser) {
+			return new Generic(parser);
+		}
+		~Generic() {
+			if (expr != NULL) {delete expr;}
+			if (list != NULL) {delete list;}
+		}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->peek();
+			if (token.getName() == "(") {
+				parser->getSource()->get(); //Actually get "(" token
+				expr = parser->parseExpression(COMMA);
+				token = parser->getSource()->get();
+				if (token.getName() == ",") {
+					token = parser->getSource()->get();
+					GenericAssociation* first = new GenericAssociation(token);
+					first->parse(parser);
+					list = new GenericAssociationList(first);
+				}
+				GenericAssociationList* currentList = list;
+				GenericAssociationList* nextList = NULL;
+				GenericAssociation* assoc = NULL;
+				token = parser->getSource()->get();
+				while (token.getName() == ",") {
+					assoc = new GenericAssociation(token);
+					assoc->parse(parser);
+					nextList = new GenericAssociationList(assoc);
+					currentList->setNext(nextList);
+					currentList = nextList;
+					token = parser->getSource()->get();
+				}
+				if (token.getName() != ")") {
+					string err = "Expected ')' after _Generic";
+					throw new SyntaxException(err);
+				}
+			} else {
+				string err = "Expected ')'";
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			string ret = "_Generic(";
+			if (expr != NULL) {
+				ret += expr->getName();
+			}
+			ret += ", ";
+			ret += list->getName();
+			ret += ")";
+			return ret;
+		}
+	private:
+		Expression* expr = NULL;
+		GenericAssociationList* list;
+};
+
 
 
 
