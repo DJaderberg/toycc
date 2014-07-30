@@ -54,9 +54,6 @@ int translate(string filename) {
 	BufferedSource<Token>* bufParserSource = new BufferedSource<Token>\
 											 (strlitconcat);
 	Parser* parser = new Parser(bufParserSource);
-	//Insert all the operators into the Parser maps
-	parser->c11Operators(); //So that it parses c11
-	//Parsing printing code
 	Expression* ptr = NULL;
 	while (true) {
 		ptr = NULL;

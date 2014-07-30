@@ -1,6 +1,3 @@
-for (i; i < a + b; ++i) {
-	a = a + b;
-}
 sum = a + b; //Comment
 mult *= a - b;
 div /= a - b;
@@ -52,11 +49,9 @@ func(a, b);
 1.2;
 "I am a string";
 _Generic(a=b, default : a=b);
-
-case 3 : {
-			 a;
-			 break;
-		 }
+{ 
+	register a;
+	a; }
 while (false) {
 	a++;
 }

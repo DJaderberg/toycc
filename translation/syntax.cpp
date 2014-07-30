@@ -10,7 +10,7 @@ string Declarator :: getName() {
 	if (pointer != NULL) {
 		//ret += pointer->getName() + " ";
 	}
-	ret += dirDecl->getName();
+	if( dirDecl != NULL) {ret += dirDecl->getName();}
 	return ret;
 }
 
@@ -102,19 +102,44 @@ BlockItemList* Parser :: parseBlockItemList() {
 }
 
 BlockItem* Parser :: parseBlockItem() {
-	//TODO: Implement declarations
 	BlockItem* ret = NULL;
 	unsigned int bufferUsed = source->bufferSize();
+	Declaration* decl = parseDeclaration();
 	try {
-		ret = new BlockItem(parseStatement());
+		decl = parseDeclaration();
 	} catch (ExpressionException) {
-		//No match with Statement, keep trying other things
+		decl = NULL;
+	} catch (DirectDeclaratorException) {
+		decl = NULL;
 	}
-	//If it was not a Statement, it should be a Declaration
-	if( ret == NULL) {
-		source->setUsed(bufferUsed);
-		Declaration* decl = parseDeclaration();
+	Statement* state = NULL;
+	unsigned int declUsed = source->bufferSize();
+	unsigned int stateUsed = 0;
+	source->setUsed(bufferUsed);
+	try {
+		state = parseStatement();
+		stateUsed = source->bufferSize();
+	} catch (ExpressionException) {
+		state = NULL;
+	}
+	if (state != NULL && decl != NULL) {
+		//Both matches, compare length
+		if (state->getName().length() > decl->getName().length()) {
+			source->setUsed(stateUsed);
+			ret = new BlockItem(state);
+		} else {
+			source->setUsed(declUsed);
+			ret = new BlockItem(decl);
+		}
+	} else if (decl != NULL) {
+		source->setUsed(declUsed);
 		ret = new BlockItem(decl);
+	} else if (state != NULL) {
+		source->setUsed(stateUsed);
+		ret = new BlockItem(state);
+	} else {
+		source->setUsed(bufferUsed);
+		ret = NULL;
 	}
 	return ret;
 }
@@ -125,8 +150,7 @@ ExpressionStatement* Parser :: parseExpressionStatement() {
 	expr = parseExpression();
 	Token after = source->get();
 	if (after.getName() != ";") {
-		string err = "Expected ';' after ExpressionStatement";
-		throw ExpressionException(err);
+		return new ExpressionStatement(NULL);
 	}
 	return new ExpressionStatement(expr);
 }
@@ -345,6 +369,42 @@ ForStatement* Parser :: parseForStatement() {
 	return new ForStatement(first, second, third, state);
 }
 
+DeclarationSpecifierList* Parser :: parseDeclarationSpecifierList() {
+	DeclarationSpecifierList* ret = NULL;
+	DeclarationSpecifier* current;
+	current = parseDeclarationSpecifier();
+	if (current != NULL) {
+		//Recursion!
+		ret = new DeclarationSpecifierList(current, parseDeclarationSpecifierList());
+	} else {
+		ret = NULL;
+	}
+	return ret;
+}
+
+DeclarationSpecifier* Parser :: parseDeclarationSpecifier() {
+	DeclarationSpecifier* ret = NULL;
+	Token token = source->peek();
+	auto search = this->mStorageClassSpecifier.find(token.getName());
+	if (search != this->mStorageClassSpecifier.end()) {
+		ret = parseStorageClassSpecifier();
+	}
+	return ret;
+
+}
+
+StorageClassSpecifier* Parser :: parseStorageClassSpecifier() {
+	StorageClassSpecifier* ret = NULL;
+	Token token = source->get();
+	auto search = this->mStorageClassSpecifier.find(token.getName());
+	if (search != this->mStorageClassSpecifier.end()) {
+		ret = new StorageClassSpecifier(token);
+	} else {
+		ret = NULL;
+	}
+	return ret;
+}
+
 
 /* Thanks to 
  * http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/
@@ -461,13 +521,19 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 }
 
 Declaration* Parser :: parseDeclaration() {
-	//TODO: Expand
 	Declaration* ret = NULL;
+	//First, a specifier list
+	DeclarationSpecifierList* declList = parseDeclarationSpecifierList();
 	try {
-		ret = new Declaration(parseInitDeclaratorList());
+		InitDeclaratorList* initList = parseInitDeclaratorList();
+		if (declList == NULL && initList == NULL) {
+			ret = NULL;
+		} else {
+			ret = new Declaration(declList, initList);
+		}
 	} catch (InitDeclaratorListException) {
 		//No problem, since the list is optional
-		ret = new Declaration();
+		ret = new Declaration(declList);
 	}
 	return ret;
 }
@@ -558,5 +624,13 @@ void Parser :: c11Operators() {
 	this->mInfix["?"] = (InfixOperator *(*)(Parser *, Expression *)) ConditionalExpression::create;
 }
 
-
+void Parser :: declarationSpecifiers() {
+	//Storage class specifiers
+	this->mStorageClassSpecifier["typedef"] = "typedef";
+	this->mStorageClassSpecifier["extern"] = "extern";
+	this->mStorageClassSpecifier["static"] = "static";
+	this->mStorageClassSpecifier["_Thread_local"] = "_Thread_local";
+	this->mStorageClassSpecifier["auto"] = "auto";
+	this->mStorageClassSpecifier["register"] = "register";
+}
 

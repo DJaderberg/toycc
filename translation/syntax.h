@@ -23,7 +23,7 @@ class NodeList : public Node {
 		NodeList(T* item) : item(item), next(NULL) {}
 		NodeList(T* item, NodeList* next) : item(item), \
 															  next(next) {}
-		string getName() {
+		virtual string getName() {
 			string ret = item->getName();
 			if (next != NULL) {
 				ret += '\n' + next->getName();
@@ -35,7 +35,7 @@ class NodeList : public Node {
 			delete item;
 		}
 		void setNext(NodeList* n) {next = n;}
-	private:
+	protected:
 		T* item;
 		NodeList* next = NULL; //Optional, might be NULL
 };
@@ -213,7 +213,7 @@ class DoWhileStatement;
 class ForStatement;
 class Identifier;
 class BlockItem;
-typedef NodeList<BlockItem> BlockItemList;
+class BlockItemList;
 class Declaration;
 class InitDeclarator;
 typedef NodeList<InitDeclarator> InitDeclaratorList;
@@ -225,11 +225,17 @@ class Expression;
 class IdentifierExpression;
 class GenericAssociationList;
 class GenericAssociation;
+class DeclarationSpecifier;
+class DeclarationSpecifierList;
+class StorageClassSpecifier;
 
 //Constructs an AST from the input Tokens
 class Parser {
 	public:
-		Parser(BufferedSource<Token>* source) : source(source) {}
+		Parser(BufferedSource<Token>* source) : source(source) {
+			this->c11Operators(); //Enter Operators
+			this->declarationSpecifiers(); //Enter c11 declaration specifiers
+		}
 		BufferedSource<Token>* getSource() {return this->source;}
 		TranslationUnit* parseTranslationUnit();
 		ExternalDeclaration* parseExternalDeclaration();
@@ -253,6 +259,14 @@ class Parser {
 		InitDeclarator* parseInitDeclarator();
 		InitDeclaratorList* parseInitDeclaratorList();
 		Declaration* parseDeclaration();
+		DeclarationSpecifierList* parseDeclarationSpecifierList();
+		DeclarationSpecifier* parseDeclarationSpecifier();
+		StorageClassSpecifier* parseStorageClassSpecifier();
+		map<string, string> mStorageClassSpecifier;
+		map<string, string> mTypeSpecifier;
+		map<string, string> mTypeQualifier;
+		map<string, string> mFunctionSpecifier;
+		map<string, string> mAlignmentSpecifier;
 		map<string, Operator* (*) (Parser*)> mPrefix; 
 		//Maps string to pointer to function which returns type Expression* and
 		//takes types Parser*, Expression* as input
@@ -260,6 +274,7 @@ class Parser {
 		//Maps string to pointer to function which returns type Expression* and
 		//takes types Parser*, Expression* as input
 		void c11Operators(); //Inserts operators to parse C11 into the maps
+		void declarationSpecifiers(); //Inserts C11 declaration specifiers
 	private:
 		BufferedSource<Token>* source;
 };
@@ -383,6 +398,18 @@ class BlockItem : public Node {
 	private:
 		Declaration* decl;
 		Statement* state;
+};
+
+class BlockItemList : public NodeList<BlockItem> {
+	public:
+		BlockItemList(BlockItem* item) : NodeList(item) {}
+		BlockItemList(BlockItem* item, BlockItemList* next) : NodeList(item, next) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) {ret += item->getName();}
+			if (next != NULL) {ret += "\n" + next->getName();}
+			return ret;
+		}
 };
 
 class BlockItemListException : public SyntaxException {
@@ -573,8 +600,8 @@ class Declarator : public Node {
 		virtual ~Declarator(); 
 		string getName();
 			private:
-		DirectDeclarator* dirDecl;
-		Pointer* pointer;
+		DirectDeclarator* dirDecl = NULL;
+		Pointer* pointer = NULL;
 };
 
 class DeclaratorException : public SyntaxException {
@@ -641,22 +668,62 @@ class InitDeclaratorListException : public SyntaxException {
 		InitDeclaratorListException(char * w) : SyntaxException(w) {}
 };
 
+class DeclarationSpecifier : public Node {
+	public:
+		DeclarationSpecifier(Token name) : name(name) {}
+		virtual void parse(Parser* parser) = 0;
+		string getName() {
+			return name.getName();
+		}
+	private:
+		Token name; //typedef, const, int, void, _Atomic, etc.
+};
+
+class DeclarationSpecifierList : public NodeList<DeclarationSpecifier> {
+	public:
+		DeclarationSpecifierList(DeclarationSpecifier* item, DeclarationSpecifierList* next) : NodeList(item, next) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) ret += item->getName() + " ";
+			if (next != NULL) ret += next->getName();
+			return ret;
+		}
+};
+
 class Declaration : public Node {
 	//TODO: Implement Declaration specifiers and static_assert declarations
 	public:
 		Declaration() : initList(NULL) {}
 		Declaration(InitDeclaratorList* initList) : initList(initList) {}
+		Declaration(DeclarationSpecifierList* declList) : declList(declList) {}
+		Declaration(DeclarationSpecifierList* declList, InitDeclaratorList* initList) : declList(declList), initList(initList) {}
 		virtual ~Declaration() {if (initList != NULL) {delete initList;}}
 		string getName() {
-			return initList->getName(); //TODO: Change
+			string ret = "";
+			if (declList != NULL) {ret += declList->getName();}
+			if (initList != NULL) {ret += initList->getName();}
+			ret += ";";
+			return ret;
 		}
 	private:
-		InitDeclaratorList* initList;
+		DeclarationSpecifierList* declList = NULL;
+		InitDeclaratorList* initList = NULL;
 };
 
 class DeclarationException : public SyntaxException {
 	DeclarationException(string w) : SyntaxException(w) {}
 	DeclarationException(char *w) : SyntaxException(w) {}
+};
+
+class TypeSpecifier : public DeclarationSpecifier {
+	public:
+		TypeSpecifier(Token name) : DeclarationSpecifier(name) {}
+};
+
+class StorageClassSpecifier : public DeclarationSpecifier {
+	public:
+		StorageClassSpecifier(Token name) : DeclarationSpecifier(name) {}
+		void parse(Parser* parser) {}
 };
 
 
@@ -1094,6 +1161,9 @@ class Sizeof : public PrefixOperator<Expression, &SizeofOpStr, UNARY> {
 			}
 			return ret;
 		}
+		virtual ~Sizeof() {
+			if (expr != NULL) {delete expr;}
+		}
 	private:
 		Token type;
 		Expression* expr = NULL;
@@ -1136,6 +1206,9 @@ class Alignof: public PrefixOperator<Expression, &SizeofOpStr, UNARY> {
 				ret += "(" + type.getName() + ")";
 			}
 			return ret;
+		}
+		virtual ~Alignof() {
+			if (expr != NULL) {delete expr;}
 		}
 	private:
 		Token type;
@@ -1265,7 +1338,7 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 class GenericAssociation : public Expression {
 	public:
 		GenericAssociation(Token type) : Expression(PRIMARY), type(type) {}
-		~GenericAssociation() {delete assignmentExpr;}
+		virtual ~GenericAssociation() {delete assignmentExpr;}
 		string getName() {
 			string ret = type.getName() + " : ";
 			if (assignmentExpr != NULL) {ret += assignmentExpr->getName();}
@@ -1345,7 +1418,7 @@ class Generic : public PrefixOperator<Expression, &GenericOpStr, UNARY> {
 		}
 	private:
 		Expression* expr = NULL;
-		GenericAssociationList* list;
+		GenericAssociationList* list = NULL;
 };
 
 
