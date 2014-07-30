@@ -104,7 +104,7 @@ BlockItemList* Parser :: parseBlockItemList() {
 BlockItem* Parser :: parseBlockItem() {
 	BlockItem* ret = NULL;
 	unsigned int bufferUsed = source->bufferSize();
-	Declaration* decl = parseDeclaration();
+	Declaration* decl = NULL;
 	try {
 		decl = parseDeclaration();
 	} catch (ExpressionException) {
@@ -524,16 +524,17 @@ Declaration* Parser :: parseDeclaration() {
 	Declaration* ret = NULL;
 	//First, a specifier list
 	DeclarationSpecifierList* declList = parseDeclarationSpecifierList();
+	InitDeclaratorList* initList = NULL;
 	try {
-		InitDeclaratorList* initList = parseInitDeclaratorList();
-		if (declList == NULL && initList == NULL) {
-			ret = NULL;
-		} else {
-			ret = new Declaration(declList, initList);
-		}
+		initList = parseInitDeclaratorList();
 	} catch (InitDeclaratorListException) {
 		//No problem, since the list is optional
 		ret = new Declaration(declList);
+	}
+	if (declList == NULL && initList == NULL) {
+		ret = NULL;
+	} else {
+		ret = new Declaration(declList, initList);
 	}
 	return ret;
 }
