@@ -240,6 +240,8 @@ IterationStatement* Parser :: parseIterationStatement() {
 		ret = parseWhileStatement();
 	} else if (token.getName() == "do") {
 		ret = parseDoWhileStatement();
+	} else if (token.getName() == "for") {
+		ret = parseForStatement();
 	}
 	return ret;
 }
@@ -289,6 +291,58 @@ DoWhileStatement* Parser :: parseDoWhileStatement() {
 		throw new SyntaxException(err);
 	}
 	return new DoWhileStatement(expr, state);
+}
+
+ForStatement* Parser :: parseForStatement() {
+	Token token = source->get();
+	if (token.getName() != "for") {
+		string err = "Expected 'for'";
+		throw new SyntaxException(err);
+	}
+	token = source->get();
+	if (token.getName() != "(") {
+		string err = "Expected '('";
+		throw new SyntaxException(err);
+	}
+	token = source->peek();
+	Expression* first = NULL;
+	if (token.getName() == ";") {
+		//Omitted first expression
+		source->get();
+	} else {
+		first = parseExpression(); //TODO:support declarations here
+	}
+	token = source->get();
+	if (token.getName() != ";") {
+		string err = "Expected ';'";
+		throw new SyntaxException(err);
+	}
+	token = source->peek();
+	Expression* second = NULL;
+	if (token.getName() == ";") {
+		//Omitted second expression is replaced with non-zero constant
+		//Here, non-zero means 1
+		source->get();
+		second = new IdentifierExpression(new Constant(Token(token.getPosition(), "1", CONSTANT)));
+	} else {
+		second = parseExpression();
+	}
+	token = source->get();
+	Expression* third = NULL;
+	if (token.getName() == ")") {
+		//Omitted third expression
+		source->get();
+	} else {
+		third = parseExpression();
+	}
+	token = source->get();
+	if (token.getName() != ")") {
+		string err = "Expected ')'";
+		throw new SyntaxException(err);
+	}
+	Statement* state = NULL;
+	state = parseStatement();
+	return new ForStatement(first, second, third, state);
 }
 
 

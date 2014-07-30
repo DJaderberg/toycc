@@ -1,3 +1,6 @@
+for (i; i < a + b; ++i) {
+	a = a + b;
+}
 sum = a + b; //Comment
 mult *= a - b;
 div /= a - b;
@@ -60,5 +63,9 @@ while (false) {
 do {
 	a--;
 } while (false)
+for (i = 0; i < a + b; ++i) {
+	a = a + b;
+}
+
 paren = (a + b) * c;
 

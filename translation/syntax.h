@@ -550,11 +550,11 @@ class ForStatement : public IterationStatement {
 		string getName() {
 			string ret = "for (";
 			if (first != NULL) {ret += first->getName();}
-			ret += ";";
+			ret += "; ";
 			if (second != NULL) {ret += second->getName();}
-			ret += ";";
+			ret += "; ";
 			if (third != NULL) {ret += third->getName();}
-			ret += ")";
+			ret += ") ";
 			if (state != NULL) {ret += state->getName();}
 			return ret;
 		}
