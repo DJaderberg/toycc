@@ -46,6 +46,9 @@ Statement* Parser :: parseStatement() {
 		return parseJumpStatement();
 	} else if (currentName == "if" || currentName == "switch") {
 		return parseSelectionStatement();
+	} else if (currentName == "for" || currentName == "do" || \
+			currentName == "while") {
+		return parseIterationStatement();
 	} else if (currentName == "case" || currentName == "default" || \
 			source->peek(1).getName() == ":") {
 		return parseLabeledStatement();
@@ -229,6 +232,65 @@ LabeledStatement* Parser :: parseLabeledStatement() {
 	}
 	return ret;
 }
+
+IterationStatement* Parser :: parseIterationStatement() {
+	Token token = source->peek();
+	IterationStatement* ret = NULL;
+	if (token.getName() == "while") {
+		ret = parseWhileStatement();
+	} else if (token.getName() == "do") {
+		ret = parseDoWhileStatement();
+	}
+	return ret;
+}
+
+WhileStatement* Parser :: parseWhileStatement() {
+	Token token = source->get();
+	if (token.getName() != "while") {
+		string err = "Expected 'while'";
+		throw new SyntaxException(err);
+	}
+	token = source->get();
+	if (token.getName() != "(") {
+		string err = "Expected '('";
+		throw new SyntaxException(err);
+	}
+	Expression* expr = parseExpression();
+	token = source->get();
+	if (token.getName() != ")") {
+		string err = "Expected ')'";
+		throw new SyntaxException(err);
+	}
+	Statement* state = parseStatement();
+	return new WhileStatement(expr, state);
+}
+
+DoWhileStatement* Parser :: parseDoWhileStatement() {
+	Token token = source->get();
+	if (token.getName() != "do") {
+		string err = "Expected 'do'";
+		throw new SyntaxException(err);
+	}
+	Statement* state = parseStatement();
+	token = source->get();
+	if (token.getName() != "while") {
+		string err = "Expected 'while'";
+		throw new SyntaxException(err);
+	}
+	token = source->get();
+	if (token.getName() != "(") {
+		string err = "Expected '('";
+		throw new SyntaxException(err);
+	}
+	Expression* expr = parseExpression();
+	token = source->get();
+	if (token.getName() != ")") {
+		string err = "Expected ')'";
+		throw new SyntaxException(err);
+	}
+	return new DoWhileStatement(expr, state);
+}
+
 
 /* Thanks to 
  * http://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/

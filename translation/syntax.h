@@ -207,6 +207,10 @@ class ExpressionStatement;
 class SelectionStatement;
 class JumpStatement;
 class LabeledStatement;
+class IterationStatement;
+class WhileStatement;
+class DoWhileStatement;
+class ForStatement;
 class Identifier;
 class BlockItem;
 typedef NodeList<BlockItem> BlockItemList;
@@ -235,6 +239,10 @@ class Parser {
 		SelectionStatement* parseSelectionStatement();
 		JumpStatement* parseJumpStatement();
 		LabeledStatement* parseLabeledStatement();
+		IterationStatement* parseIterationStatement();
+		WhileStatement* parseWhileStatement();
+		DoWhileStatement* parseDoWhileStatement();
+		ForStatement* parseForStatement();
 		Expression* parseExpression();
 		Expression* parseExpression(PriorityEnum priority);
 		Identifier* parseIdentifier();
@@ -491,6 +499,69 @@ class LabeledStatement : public Statement {
 	private:
 		Token first; //Should be 'case', 'default' or an identifier
 		Expression* constExpr = NULL; //Optional
+		Statement* state = NULL;
+};
+
+class WhileStatement;
+class DoWhileStatement;
+class ForStatement;
+
+class IterationStatement : public Statement {
+};
+
+class WhileStatement : public IterationStatement {
+	public:
+		WhileStatement(Expression* expr, Statement* state) : expr(expr), \
+															 state(state) {}
+		string getName() {
+			string ret = "while (";
+			if (expr != NULL) {ret += expr->getName();}
+			ret += ")";
+			if (state != NULL) {ret += state->getName();}
+			return ret;
+		}
+	private:
+		Expression* expr = NULL;
+		Statement* state = NULL;
+};
+
+class DoWhileStatement : public IterationStatement {
+	public:
+		DoWhileStatement(Expression* expr, Statement* state) : expr(expr), \
+															 state(state) {}
+		string getName() {
+			string ret = "do ";
+			if (state != NULL) {ret += state->getName();}
+			ret += " while (";
+			if (expr != NULL) {ret += expr->getName();}
+			ret += ")";
+			return ret;
+		}
+	private:
+		Expression* expr = NULL;
+		Statement* state = NULL;
+};
+
+class ForStatement : public IterationStatement {
+	public:
+		ForStatement(Expression* first, Expression* second, Expression* third, \
+				Statement* state) : first(first), second(second), third(third),\
+									state(state) {}
+		string getName() {
+			string ret = "for (";
+			if (first != NULL) {ret += first->getName();}
+			ret += ";";
+			if (second != NULL) {ret += second->getName();}
+			ret += ";";
+			if (third != NULL) {ret += third->getName();}
+			ret += ")";
+			if (state != NULL) {ret += state->getName();}
+			return ret;
+		}
+	private:
+		Expression* first = NULL;
+		Expression* second = NULL;
+		Expression* third = NULL;
 		Statement* state = NULL;
 };
 

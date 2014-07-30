@@ -54,5 +54,11 @@ case 3 : {
 			 a;
 			 break;
 		 }
+while (false) {
+	a++;
+}
+do {
+	a--;
+} while (false)
 paren = (a + b) * c;
 
