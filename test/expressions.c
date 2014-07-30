@@ -9,7 +9,7 @@ rsh >>= a - b;
 ads &= a - b;
 xor ^= a - b;
 or |= a - b;
-cond = true ? true : false; //Seems to mess up memory sometimes
+cond = true ? true : false; //Seems to mess up memory sometimes?
 LOR = a || b;
 LAND = a && b;
 BOR = a | b;
@@ -50,5 +50,9 @@ func(a, b);
 "I am a string";
 _Generic(a=b, default : a=b);
 
+case 3 : {
+			 a;
+			 break;
+		 }
 paren = (a + b) * c;
 

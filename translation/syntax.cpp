@@ -46,8 +46,15 @@ Statement* Parser :: parseStatement() {
 		return parseJumpStatement();
 	} else if (currentName == "if" || currentName == "switch") {
 		return parseSelectionStatement();
+	} else if (currentName == "case" || currentName == "default" || \
+			source->peek(1).getName() == ":") {
+		return parseLabeledStatement();
 	} else if (currentName == "\{") {
 		return parseCompoundStatement();
+	} else if (currentName == ";") {
+		//Empty ExpressionStatement, OK, since the actual expression is optional
+		source->get();
+		return new ExpressionStatement(NULL);
 	}
 	return parseExpressionStatement();
 }
@@ -199,6 +206,26 @@ JumpStatement* Parser :: parseJumpStatement() {
 	if (current.getName() != ";") {
 		string err = "Expected ';' after jump statement";
 		throw new SyntaxException(err);
+	}
+	return ret;
+}
+
+LabeledStatement* Parser :: parseLabeledStatement() {
+	LabeledStatement* ret = NULL;
+	Token first = source->get();
+	if (first.getKey() == KEYWORD || first.getKey() == IDENTIFIER) {
+		Expression* constExpr = NULL;
+		if (source->peek().getName() == ":") {
+			//No constant expression
+		} else {
+			constExpr = parseExpression(CONDITIONAL);
+			if (source->peek().getName() != ":") {
+				return NULL;
+			}
+		}
+		source->get(); //Eat ':' token
+		Statement* state = parseStatement();
+		ret = new LabeledStatement(first, constExpr, state);
 	}
 	return ret;
 }

@@ -206,6 +206,7 @@ class CompoundStatement;
 class ExpressionStatement;
 class SelectionStatement;
 class JumpStatement;
+class LabeledStatement;
 class Identifier;
 class BlockItem;
 typedef NodeList<BlockItem> BlockItemList;
@@ -233,6 +234,7 @@ class Parser {
 		ExpressionStatement* parseExpressionStatement();
 		SelectionStatement* parseSelectionStatement();
 		JumpStatement* parseJumpStatement();
+		LabeledStatement* parseLabeledStatement();
 		Expression* parseExpression();
 		Expression* parseExpression(PriorityEnum priority);
 		Identifier* parseIdentifier();
@@ -410,7 +412,7 @@ class ExpressionStatement : public Statement {
 			return ret;
 		}
 	private:
-		Expression* expression = NULL;
+		Expression* expression = NULL; //Optional
 };
 
 class SelectionStatement : public Statement {
@@ -470,6 +472,26 @@ class JumpStatement : public Statement {
 		string keyword;
 		Identifier* id = NULL;
 		Expression* expr = NULL;
+};
+
+class LabeledStatement : public Statement {
+	public:
+		LabeledStatement(Token first, Statement* state) : first(first), \
+														  state(state) {}
+		LabeledStatement(Token first, Expression* expr, Statement* state) \
+		: first(first),  constExpr(expr), state(state) {}
+		string getName() {
+			string ret = first.getName();
+			ret += " ";
+			if (constExpr != NULL) {ret += constExpr->getName();}
+			ret += " : ";
+			if (state != NULL) {ret += state->getName();}
+			return ret;
+		}
+	private:
+		Token first; //Should be 'case', 'default' or an identifier
+		Expression* constExpr = NULL; //Optional
+		Statement* state = NULL;
 };
 
 class Declarator : public Node {
