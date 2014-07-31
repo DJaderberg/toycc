@@ -417,7 +417,7 @@ TypeSpecifier* Parser :: parseTypeSpecifier() {
 		if (token.getName() == "_Atomic") {
 			ret = new AtomicTypeSpecifier(token);
 		} else if (token.getName() == "enum") {
-
+			ret = new EnumTypeSpecifier(token);
 		} else if (token.getName() == "struct" || token.getName() == "union") {
 
 		} else {
@@ -425,6 +425,19 @@ TypeSpecifier* Parser :: parseTypeSpecifier() {
 		}
 	}
 	if (ret != NULL) {ret->parse(this);}
+	return ret;
+}
+
+EnumeratorList* Parser :: parseEnumeratorList() {
+	EnumeratorList* ret = NULL;
+	Token token = source->get();
+	if (token.getName() != "," && token.getName() != "}") {
+		ret = new EnumeratorList(new Enumerator(token), parseEnumeratorList());
+	} else if (token.getName() == ",") {
+		ret = parseEnumeratorList();
+	} else if (token.getName() == "}") {
+		ret = NULL;
+	}
 	return ret;
 }
 

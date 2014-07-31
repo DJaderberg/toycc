@@ -1,3 +1,6 @@
+{
+	enum {ENUM_ZERO, ENUM_ONE} a;
+}
 sum = a + b; //Comment
 mult *= a - b;
 div /= a - b;

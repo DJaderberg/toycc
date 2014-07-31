@@ -229,6 +229,8 @@ class DeclarationSpecifier;
 class DeclarationSpecifierList;
 class StorageClassSpecifier;
 class TypeSpecifier;
+class Enumerator;
+class EnumeratorList;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -264,6 +266,7 @@ class Parser {
 		DeclarationSpecifier* parseDeclarationSpecifier();
 		StorageClassSpecifier* parseStorageClassSpecifier();
 		TypeSpecifier* parseTypeSpecifier();
+		EnumeratorList* parseEnumeratorList();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -300,6 +303,12 @@ class Constant : public Identifier {
 	public:
 		Constant(Token token) : Identifier(token) {}
 		virtual ~Constant() {}
+};
+
+class EnumerationConstant : public Constant {
+	public:
+		EnumerationConstant(Token token) : Constant(token) {}
+		virtual ~EnumerationConstant() {}
 };
 
 class StringLiteral : public Identifier {
@@ -398,8 +407,8 @@ class BlockItem : public Node {
 		virtual ~BlockItem();
 		string getName();
 	private:
-		Declaration* decl;
-		Statement* state;
+		Declaration* decl = NULL;
+		Statement* state = NULL;
 };
 
 class BlockItemList : public NodeList<BlockItem> {
@@ -687,10 +696,10 @@ class DeclarationSpecifier : public Node {
 	public:
 		DeclarationSpecifier(Token name) : name(name) {}
 		virtual void parse(Parser* parser) = 0;
-		string getName() {
+		virtual string getName() {
 			return name.getName();
 		}
-	private:
+	protected:
 		Token name; //typedef, const, int, void, _Atomic, etc.
 };
 
@@ -754,6 +763,74 @@ class AtomicTypeSpecifier : public TypeSpecifier {
 		}
 	private:
 		Token type;
+};
+
+class Enumerator : public Expression {
+	public:
+		Enumerator(Token enumConst) \
+			: Expression(CONDITIONAL), \
+			enumConst(new EnumerationConstant(enumConst)) {}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->peek();
+			if (token.getName() == "=") {
+				parser->getSource()->get();
+				constExpr = parser->parseExpression(CONDITIONAL);
+			}
+		}
+		string getName() {
+			string ret = "";
+			if (enumConst != NULL) {ret += enumConst->getName();}
+			if (constExpr != NULL) {ret += " = " + constExpr->getName();}
+			return ret;
+		}
+		virtual ~Enumerator() {
+			if (enumConst != NULL) {delete enumConst;}
+			if (constExpr != NULL) {delete constExpr;}
+		}
+	private:
+		EnumerationConstant* enumConst = NULL;
+		Expression* constExpr = NULL;
+};
+
+class EnumeratorList : public NodeList<Enumerator> {
+	public:
+		EnumeratorList(Enumerator* item) : NodeList(item) {}
+		EnumeratorList(Enumerator* item, EnumeratorList* next) : \
+			NodeList(item, next) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) {ret += item->getName();}
+			if (next != NULL) {ret += ", " + next->getName();}
+			return ret;
+		}
+};
+
+
+class EnumTypeSpecifier : public TypeSpecifier {
+	public:
+		EnumTypeSpecifier(Token name) : TypeSpecifier(name) {}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->get();
+			if (token.getKey() == IDENTIFIER) {
+				id = token;
+				usingId = true;
+				token = parser->getSource()->get();
+			}
+			if (token.getName() == "{") {
+				list = parser->parseEnumeratorList();
+			}
+		}
+		string getName() {
+			string ret = "";
+			ret += DeclarationSpecifier::getName();
+			if (usingId) {ret += " " + id.getName();}
+			if (list != NULL) {ret += "{" + list->getName() + "}";}
+			return ret;
+		}
+	private:
+		bool usingId = false;
+		Token id;
+		EnumeratorList* list = NULL;
 };
 
 class StorageClassSpecifier : public DeclarationSpecifier {
