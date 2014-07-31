@@ -389,6 +389,10 @@ DeclarationSpecifier* Parser :: parseDeclarationSpecifier() {
 	if (search != this->mStorageClassSpecifier.end()) {
 		ret = parseStorageClassSpecifier();
 	}
+	search = this->mTypeSpecifier.find(token.getName());
+	if (search != this->mTypeSpecifier.end()) {
+		ret = parseTypeSpecifier();
+	}
 	return ret;
 
 }
@@ -399,9 +403,28 @@ StorageClassSpecifier* Parser :: parseStorageClassSpecifier() {
 	auto search = this->mStorageClassSpecifier.find(token.getName());
 	if (search != this->mStorageClassSpecifier.end()) {
 		ret = new StorageClassSpecifier(token);
-	} else {
-		ret = NULL;
+		ret->parse(this);
 	}
+	return ret;
+}
+
+TypeSpecifier* Parser :: parseTypeSpecifier() {
+	//TODO: Add typedef'd types
+	TypeSpecifier* ret = NULL;
+	Token token = source->get();
+	auto search = this->mTypeSpecifier.find(token.getName());
+	if (search != this->mTypeSpecifier.end()) {
+		if (token.getName() == "_Atomic") {
+			ret = new AtomicTypeSpecifier(token);
+		} else if (token.getName() == "enum") {
+
+		} else if (token.getName() == "struct" || token.getName() == "union") {
+
+		} else {
+			ret = new TypeSpecifier(token);
+		}
+	}
+	if (ret != NULL) {ret->parse(this);}
 	return ret;
 }
 
@@ -633,5 +656,25 @@ void Parser :: declarationSpecifiers() {
 	this->mStorageClassSpecifier["_Thread_local"] = "_Thread_local";
 	this->mStorageClassSpecifier["auto"] = "auto";
 	this->mStorageClassSpecifier["register"] = "register";
+
+	//Type class specifiers
+	this->mTypeSpecifier["v"] = "v";
+	this->mTypeSpecifier["void"] = "void";
+	this->mTypeSpecifier["char"] = "char";
+	this->mTypeSpecifier["short"] = "short";
+	this->mTypeSpecifier["int"] = "int";
+	this->mTypeSpecifier["long"] = "long";
+	this->mTypeSpecifier["float"] = "float";
+	this->mTypeSpecifier["double"] = "double";
+	this->mTypeSpecifier["signed"] = "signed";
+	this->mTypeSpecifier["unsigned"] = "unsigned";
+	this->mTypeSpecifier["_Bool"] = "_Bool";
+	this->mTypeSpecifier["_Complex"] = "_Complex";
+	this->mTypeSpecifier["_Atomic"] = "_Atomic";
+	this->mTypeSpecifier["struct"] = "struct";
+	this->mTypeSpecifier["union"] = "union";
+	this->mTypeSpecifier["enum"] = "enum";
+	this->mTypeSpecifier["v"] = "v";
+	//Typedefs are missing here, since they are only a generic identifier
 }
 

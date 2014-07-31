@@ -216,7 +216,7 @@ class BlockItem;
 class BlockItemList;
 class Declaration;
 class InitDeclarator;
-typedef NodeList<InitDeclarator> InitDeclaratorList;
+class InitDeclaratorList;
 class Declarator;
 class DirectDeclarator;
 class Initializer;
@@ -228,6 +228,7 @@ class GenericAssociation;
 class DeclarationSpecifier;
 class DeclarationSpecifierList;
 class StorageClassSpecifier;
+class TypeSpecifier;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -262,6 +263,7 @@ class Parser {
 		DeclarationSpecifierList* parseDeclarationSpecifierList();
 		DeclarationSpecifier* parseDeclarationSpecifier();
 		StorageClassSpecifier* parseStorageClassSpecifier();
+		TypeSpecifier* parseTypeSpecifier();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -662,6 +664,19 @@ class InitDeclaratorException : public SyntaxException {
 		InitDeclaratorException(char * w) : SyntaxException(w) {}
 };
 
+class InitDeclaratorList : public NodeList<InitDeclarator> {
+	public:
+		InitDeclaratorList(InitDeclarator* item) : NodeList(item) {}
+		InitDeclaratorList(InitDeclarator* item, InitDeclaratorList* next) \
+			: NodeList(item, next) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) {ret += item->getName();}
+			if (next != NULL) {ret += ", " + next->getName();}
+			return ret;
+		}
+};
+
 class InitDeclaratorListException : public SyntaxException {
 	public:
 		InitDeclaratorListException(string w) : SyntaxException(w) {}
@@ -684,8 +699,8 @@ class DeclarationSpecifierList : public NodeList<DeclarationSpecifier> {
 		DeclarationSpecifierList(DeclarationSpecifier* item, DeclarationSpecifierList* next) : NodeList(item, next) {}
 		string getName() {
 			string ret = "";
-			if (item != NULL) ret += item->getName() + " ";
-			if (next != NULL) ret += next->getName();
+			if (item != NULL) {ret += item->getName() + " ";}
+			if (next != NULL) {ret += next->getName();}
 			return ret;
 		}
 };
@@ -718,6 +733,27 @@ class DeclarationException : public SyntaxException {
 class TypeSpecifier : public DeclarationSpecifier {
 	public:
 		TypeSpecifier(Token name) : DeclarationSpecifier(name) {}
+		virtual void parse(Parser* parser) {}
+};
+
+class AtomicTypeSpecifier : public TypeSpecifier {
+	public:
+		AtomicTypeSpecifier(Token name) : TypeSpecifier(name) {}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->get();
+			if (token.getName() != "(") {
+				string err = "Expected '('";
+				throw new SyntaxException(err);
+			}
+			type = parser->getSource()->get();
+			token = parser->getSource()->get();
+			if (token.getName() != ")") {
+				string err = "Expected ')'";
+				throw new SyntaxException(err);
+			}
+		}
+	private:
+		Token type;
 };
 
 class StorageClassSpecifier : public DeclarationSpecifier {

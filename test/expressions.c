@@ -50,7 +50,7 @@ func(a, b);
 "I am a string";
 _Generic(a=b, default : a=b);
 { 
-	register a;
+	static register int a, b;
 	a; }
 while (false) {
 	a++;
