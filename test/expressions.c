@@ -1,6 +1,3 @@
-{
-	enum {ENUM_ZERO, ENUM_ONE} a;
-}
 sum = a + b; //Comment
 mult *= a - b;
 div /= a - b;
@@ -53,8 +50,11 @@ func(a, b);
 "I am a string";
 _Generic(a=b, default : a=b);
 { 
-	static register int a, b;
-	a; }
+	static register const int _Atomic(int) _Alignas(4) a, b;
+}
+{
+	enum {ENUM_ZERO, ENUM_ONE} a;
+}
 while (false) {
 	a++;
 }

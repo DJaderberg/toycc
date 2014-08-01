@@ -384,14 +384,46 @@ DeclarationSpecifierList* Parser :: parseDeclarationSpecifierList() {
 
 DeclarationSpecifier* Parser :: parseDeclarationSpecifier() {
 	DeclarationSpecifier* ret = NULL;
+	//Storage class specifiers
 	Token token = source->peek();
 	auto search = this->mStorageClassSpecifier.find(token.getName());
 	if (search != this->mStorageClassSpecifier.end()) {
-		ret = parseStorageClassSpecifier();
+		return parseStorageClassSpecifier();
 	}
+	//Function specifiers
+	search = this->mFunctionSpecifier.find(token.getName());
+	if (search != this->mFunctionSpecifier.end()) {
+		return parseFunctionSpecifier();
+	}
+	//Type Qualifiers
+	search = this->mTypeQualifier.find(token.getName());
+	if (search != this->mTypeQualifier.end()) {
+		if (token.getName() == "_Atomic") {
+			if (source->peek(1).getName() == "(") {
+			} else {
+				return parseTypeQualifier();
+			}
+		} else {
+			return parseTypeQualifier();
+		}
+	}
+	//Type Specifiers
 	search = this->mTypeSpecifier.find(token.getName());
 	if (search != this->mTypeSpecifier.end()) {
-		ret = parseTypeSpecifier();
+		if (token.getName() == "_Atomic") {
+			//If _Atomic, make there's a pair of parenthesis after,
+			//otherwise do nothing (is TypeQualifier instead)
+			if (source->peek(1).getName() == "(") {
+				return parseTypeSpecifier();
+			}
+		} else {
+			return parseTypeSpecifier();
+		}
+	}
+	//Alignment Specifiers
+	search = this->mAlignmentSpecifier.find(token.getName());
+	if (search != this->mAlignmentSpecifier.end()) {
+		return parseAlignmentSpecifier();
 	}
 	return ret;
 
@@ -440,6 +472,38 @@ EnumeratorList* Parser :: parseEnumeratorList() {
 	}
 	return ret;
 }
+
+TypeQualifier* Parser :: parseTypeQualifier() {
+	TypeQualifier* ret = NULL;
+	Token token = source->get();
+	auto search = mTypeQualifier.find(token.getName());
+	if (search != mTypeQualifier.end()) {
+		ret = new TypeQualifier(token);
+	}
+	return ret;
+}
+
+FunctionSpecifier* Parser :: parseFunctionSpecifier() {
+	FunctionSpecifier* ret = NULL;
+	Token token = source->get();
+	auto search = mFunctionSpecifier.find(token.getName());
+	if (search != mFunctionSpecifier.end()) {
+		ret = new FunctionSpecifier(token);
+	}
+	return ret;
+}
+
+AlignmentSpecifier* Parser :: parseAlignmentSpecifier() {
+	AlignmentSpecifier* ret = NULL;
+	Token token = source->get();
+	auto search = mAlignmentSpecifier.find(token.getName());
+	if (search != mAlignmentSpecifier.end()) {
+		ret = new AlignmentSpecifier(token);
+		ret->parse(this);
+	}
+	return ret;
+}
+
 
 
 /* Thanks to 
@@ -687,7 +751,19 @@ void Parser :: declarationSpecifiers() {
 	this->mTypeSpecifier["struct"] = "struct";
 	this->mTypeSpecifier["union"] = "union";
 	this->mTypeSpecifier["enum"] = "enum";
-	this->mTypeSpecifier["v"] = "v";
 	//Typedefs are missing here, since they are only a generic identifier
+	
+	//Type qualifiers
+	this->mTypeQualifier["const"] = "const";
+	this->mTypeQualifier["restrict"] = "restrict";
+	this->mTypeQualifier["volatile"] = "volatile";
+	this->mTypeQualifier["_Atomic"] = "_Atomic";
+
+	//Function specifiers
+	this->mTypeSpecifier["inline"] = "inline";
+	this->mTypeSpecifier["_Noreturn"] = "_Noreturn";
+
+	//Alignment specifiers
+	this->mAlignmentSpecifier["_Alignas"] = "_Alignas";
 }
 

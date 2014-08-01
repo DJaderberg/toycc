@@ -229,6 +229,9 @@ class DeclarationSpecifier;
 class DeclarationSpecifierList;
 class StorageClassSpecifier;
 class TypeSpecifier;
+class TypeQualifier;
+class FunctionSpecifier;
+class AlignmentSpecifier;
 class Enumerator;
 class EnumeratorList;
 
@@ -266,6 +269,9 @@ class Parser {
 		DeclarationSpecifier* parseDeclarationSpecifier();
 		StorageClassSpecifier* parseStorageClassSpecifier();
 		TypeSpecifier* parseTypeSpecifier();
+		TypeQualifier* parseTypeQualifier();
+		FunctionSpecifier* parseFunctionSpecifier();
+		AlignmentSpecifier* parseAlignmentSpecifier();
 		EnumeratorList* parseEnumeratorList();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
@@ -761,6 +767,11 @@ class AtomicTypeSpecifier : public TypeSpecifier {
 				throw new SyntaxException(err);
 			}
 		}
+		string getName() {
+			string ret = TypeSpecifier::getName();
+			ret += "(" + type.getName() + ")";
+			return ret;
+		}
 	private:
 		Token type;
 };
@@ -837,6 +848,57 @@ class StorageClassSpecifier : public DeclarationSpecifier {
 	public:
 		StorageClassSpecifier(Token name) : DeclarationSpecifier(name) {}
 		void parse(Parser* parser) {}
+};
+
+class TypeQualifier : public DeclarationSpecifier {
+	public:
+		TypeQualifier(Token name) : DeclarationSpecifier(name) {}
+		virtual void parse(Parser* parser) {}
+};
+
+class FunctionSpecifier : public DeclarationSpecifier {
+	public:
+		FunctionSpecifier(Token name) : DeclarationSpecifier(name) {}
+		virtual void parse(Parser* parser) {}
+};
+
+class AlignmentSpecifier : public DeclarationSpecifier {
+	public:
+		AlignmentSpecifier(Token name) : DeclarationSpecifier(name) {}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->get();
+			if (token.getName() == "(") {
+				token = parser->getSource()->peek();
+				auto search = parser->mTypeSpecifier.find(token.getName());
+				if (search != parser->mTypeSpecifier.end()) {
+					parser->getSource()->get();
+					type = token;
+				} else {
+					constExpr = parser->parseExpression(CONDITIONAL);
+				}
+				token = parser->getSource()->get();
+				if (token.getName() != ")") {
+					string err = "Expected ')'";
+					throw new SyntaxException(err);
+				}
+			} else {
+				string err = "Expected '(' after '_Alignas'";
+				throw new SyntaxException(err);
+			}
+		}
+		string getName() {
+			string ret = DeclarationSpecifier::getName() + "(";
+			if (constExpr != NULL) {
+				ret += constExpr->getName();
+			} else {
+				ret += type.getName();
+			}
+			ret += ")";
+			return ret;
+		}
+	private:
+		Token type;
+		Expression* constExpr = NULL;
 };
 
 
