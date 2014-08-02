@@ -689,13 +689,30 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 		if (paramTypeList == NULL) {
 			paramUsed = bufferBefore;
 		}
+
+		source->setUsed(bufferBefore);
+		IdentifierList* idList = parseIdentifierList();
+		unsigned int idListUsed = source->bufferSize();
+		if (idList == NULL) {
+			idListUsed = bufferBefore;
+		}
 		
 		if (declUsed > paramUsed) {
-			ret = new DeclaratorDirectDeclarator(decl);
-			source->setUsed(declUsed);
+			if (declUsed > idListUsed) {
+				ret = new DeclaratorDirectDeclarator(decl);
+				source->setUsed(declUsed);
+			} else {
+				ret = new IdentifierListDirectDeclarator(idList);
+				source->setUsed(idListUsed);
+			}
 		} else {
-			ret = new ParameterTypeListDirectDeclarator(paramTypeList);
-			source->setUsed(paramUsed);
+			if (paramUsed > idListUsed) {
+				ret = new ParameterTypeListDirectDeclarator(paramTypeList);
+				source->setUsed(paramUsed);
+			} else {
+				ret = new IdentifierListDirectDeclarator(idList);
+				source->setUsed(idListUsed);
+			}
 		}
 		if (source->get().getName() != ")") {
 			string err = "Expected ')'";
@@ -707,6 +724,26 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 		ret = new IdentifierDirectDeclarator(id, next);
 	} else {
 		ret = NULL;
+	}
+	return ret;
+}
+
+IdentifierList* Parser :: parseIdentifierList() {
+	IdentifierList* ret = NULL;
+	Identifier* id = NULL;
+	//To avoid SyntaxException("Expected identifier")
+	if (source->peek().getKey() == IDENTIFIER) {
+		id = parseIdentifier();
+	}
+	if (id == NULL) {
+		ret = NULL;
+	} else {
+		if (source->peek().getName() == ",") {
+			source->get();
+			ret = new IdentifierList(id, parseIdentifierList());
+		} else {
+			ret = new IdentifierList(id);
+		}
 	}
 	return ret;
 }

@@ -212,6 +212,7 @@ class WhileStatement;
 class DoWhileStatement;
 class ForStatement;
 class Identifier;
+class IdentifierList;
 class BlockItem;
 class BlockItemList;
 class Declaration;
@@ -283,6 +284,7 @@ class Parser {
 		ParameterTypeList* parseParameterTypeList();
 		ParameterList* parseParameterList();
 		ParameterDeclaration* parseParameterDeclaration();
+		IdentifierList* parseIdentifierList();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -307,6 +309,19 @@ class Identifier : public Node {
 		virtual ~Identifier() {}
 	private:
 		Token token;
+};
+
+class IdentifierList : public NodeList<Identifier> {
+	public:
+		IdentifierList(Identifier* item) : NodeList(item) {}
+		IdentifierList(Identifier* item, IdentifierList* next) \
+			: NodeList(item, next) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) {ret += item->getName();}
+			if (next != NULL) {ret += ", " + next->getName();}
+			return ret;
+		}
 };
 
 class Keyword : public Identifier {
@@ -762,6 +777,21 @@ class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 		string getName();
 	private:
 		ParameterTypeList* params = NULL;
+};
+
+class IdentifierListDirectDeclarator : public DirectDeclarator {
+	public:
+		IdentifierListDirectDeclarator() : idList(NULL) {}
+		IdentifierListDirectDeclarator(IdentifierList* idList) \
+			: idList(idList) {}
+		string getName() {
+			string ret = "(";
+			if (idList != NULL) {ret += idList->getName();}
+			ret += ")";
+			return ret;
+		}
+	private:
+		IdentifierList* idList = NULL;
 };
 
 class DirectDeclaratorException : public SyntaxException {
