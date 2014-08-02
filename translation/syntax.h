@@ -271,6 +271,7 @@ class Parser {
 		DirectDeclarator* parseDirectDeclarator();
 		InitDeclarator* parseInitDeclarator();
 		InitDeclaratorList* parseInitDeclaratorList();
+		Initializer* parseInitializer();
 		Declaration* parseDeclaration();
 		DeclarationList* parseDeclarationList();
 		DeclarationSpecifierList* parseDeclarationSpecifierList();
@@ -816,6 +817,22 @@ class DirectDeclaratorException : public SyntaxException {
 		DirectDeclaratorException(char * w) : SyntaxException(w) {}
 };
 
+class Initializer : public Node {
+	//TODO: Implement Initializer lists
+	public:
+		Initializer(Expression* expr) : expr(expr) {}
+		string getName() {
+			string ret = "";
+			if (expr != NULL) {ret += expr->getName();}
+			return ret;
+		}
+		virtual ~Initializer() {
+			if (expr != NULL) {delete expr;}
+		}
+	private:
+		Expression* expr = NULL;
+};
+
 class InitDeclarator : public Node {
 	public:
 		InitDeclarator(Declarator* dec) : dec(dec), init(NULL) {}
@@ -823,12 +840,12 @@ class InitDeclarator : public Node {
 															 init(init) {}
 		virtual ~InitDeclarator() {
 			if (dec != NULL) {delete dec;}
-			/*if (init != NULL) {delete init;} TODO: Implement Initializer */
+			if (init != NULL) {delete init;}
 		}
 		string getName() {
 			string ret = "";
 			if (dec != NULL) {ret += dec->getName();}
-			/*if (init != NULL) {ret += " = " + init->getName();}*/
+			if (init != NULL) {ret += " = " + init->getName();}
 			return ret;
 		}
 	private:

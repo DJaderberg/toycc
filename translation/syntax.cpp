@@ -892,15 +892,27 @@ InitDeclaratorList* Parser :: parseInitDeclaratorList() {
 }
 
 InitDeclarator* Parser :: parseInitDeclarator() {
-	//TODO: Implement ' = Initializer'
 	InitDeclarator* ret = NULL;
+	Declarator* decl = NULL;
+	Initializer* init = NULL;
 	try {
-		ret = new InitDeclarator(parseDeclarator());
+		decl = parseDeclarator();
 	} catch (DeclaratorException) {
 		string err = "Could not parse declarator in init declarator";
 		throw new InitDeclaratorException(err);
 	}
+	if (source->peek().getName() == "=") {
+		source->get();
+		init = parseInitializer();
+	}
+	ret = new InitDeclarator(decl, init);
 	return ret;
+}
+
+Initializer* Parser :: parseInitializer() {
+	//TODO: Implement initializer-lists
+	Expression* expr = parseExpression(ASSIGNMENT);
+	return new Initializer(expr);
 }
 
 void Parser :: c11Operators() {
