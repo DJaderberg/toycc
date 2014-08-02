@@ -240,6 +240,7 @@ class FunctionDefinition;
 class ParameterTypeList;
 class ParameterList;
 class ParameterDeclaration;
+class TypeQualifierList;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -285,6 +286,8 @@ class Parser {
 		ParameterList* parseParameterList();
 		ParameterDeclaration* parseParameterDeclaration();
 		IdentifierList* parseIdentifierList();
+		Pointer* parsePointer();
+		TypeQualifierList* parseTypeQualifierList();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -641,6 +644,19 @@ class ForStatement : public IterationStatement {
 		Statement* state = NULL;
 };
 
+class Pointer : public Node {
+	public:
+		Pointer(TypeQualifierList* typeQualList, Pointer* next) : \
+			typeQualList(typeQualList), next(next) {}
+		Pointer(TypeQualifierList* typeQualList) : \
+			typeQualList(typeQualList), next(NULL) {}
+		string getName();
+		virtual ~Pointer();
+	private:
+		TypeQualifierList* typeQualList = NULL;
+		Pointer* next = NULL;
+};
+
 class Declarator : public Node {
 	//TODO: Implement the optional Pointer here
 	public:
@@ -767,7 +783,7 @@ class ParameterTypeList : public Node {
 		}
 	private:
 		ParameterList* paramList = NULL;
-		bool hasTrailing = false; //If list is ended with ', ...'
+		bool hasTrailing = false; //If list ends with ', ...'
 };
 
 class ParameterTypeListDirectDeclarator : public DirectDeclarator {
@@ -1039,6 +1055,19 @@ class TypeQualifier : public DeclarationSpecifier {
 	public:
 		TypeQualifier(Token name) : DeclarationSpecifier(name) {}
 		virtual void parse(Parser* parser) {}
+};
+
+class TypeQualifierList : public NodeList<TypeQualifier> {
+	public:
+		TypeQualifierList(TypeQualifier* item, TypeQualifierList* next) : \
+			NodeList(item, next) {}
+		TypeQualifierList(TypeQualifier* item) : NodeList(item) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) {ret = item->getName();}
+			if (next != NULL) {ret = next->getName();}
+			return ret;
+		}
 };
 
 class FunctionSpecifier : public DeclarationSpecifier {

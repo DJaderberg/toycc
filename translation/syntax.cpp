@@ -37,7 +37,7 @@ Declarator :: ~Declarator() {
 string Declarator :: getName() {
 	string ret = "";
 	if (pointer != NULL) {
-		//ret += pointer->getName() + " ";
+		ret += pointer->getName() + " ";
 	}
 	if( dirDecl != NULL) {ret += dirDecl->getName();}
 	return ret;
@@ -52,6 +52,17 @@ string BlockItem :: getName() {
 	if (state != NULL) {return state->getName();}
 	if (decl != NULL) {return decl->getName();}
 	return "";
+}
+
+string Pointer :: getName() {
+	string ret = "*";
+	if (typeQualList != NULL) {ret += typeQualList->getName();}
+	if (next != NULL) {ret += next->getName();}
+	return ret;
+}
+Pointer :: ~Pointer() {
+	if (typeQualList != NULL) {delete typeQualList;}
+	if (next != NULL) {delete next;}
 }
 
 /*TranslationUnit* Parser :: parseTranslationUnit() {
@@ -655,15 +666,47 @@ Identifier* Parser :: parseIdentifier() {
 }
 
 Declarator* Parser :: parseDeclarator() {
-	//TODO: Implement optional pointers
 	Declarator* ret = NULL;
+	Pointer* ptr = NULL;
+	if (source->peek().getName() == "*") {
+		ptr = parsePointer();
+	}
 	DirectDeclarator* dirDecl = NULL;
 	try {
 		dirDecl = parseDirectDeclarator();
-		ret = new Declarator(dirDecl);
+		ret = new Declarator(dirDecl, ptr);
 	} catch (DirectDeclaratorException& error) {
 		string err = "Could not parse direct declarator in declarator";
 		throw new DeclaratorException(err);
+	}
+	return ret;
+}
+
+Pointer* Parser :: parsePointer() {
+	Pointer* ret = NULL;
+	Token token = source->peek();
+	if (token.getName() != "*") {
+		return NULL;
+	}
+	source->get();
+	unsigned int bufferUsed = source->bufferSize();
+	TypeQualifierList* typeQualList = parseTypeQualifierList();
+	if (typeQualList == NULL) {
+		source->setUsed(bufferUsed);
+	}
+	Pointer* next = parsePointer();
+	ret = new Pointer(typeQualList, next);
+	return ret;
+}
+
+TypeQualifierList* Parser :: parseTypeQualifierList() {
+	TypeQualifierList* ret = NULL;
+	TypeQualifier* item = parseTypeQualifier();
+	if (item == NULL) {
+		ret = NULL;
+	} else {
+		TypeQualifierList* next = parseTypeQualifierList();
+		ret = new TypeQualifierList(item, next);
 	}
 	return ret;
 }
@@ -715,8 +758,9 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 			}
 		}
 		if (source->get().getName() != ")") {
-			string err = "Expected ')'";
-			throw new SyntaxException(err);
+			//string err = "Expected ')'";
+			//throw new SyntaxException(err);
+			ret = NULL;
 		}
 	} else if (peek.getKey() == IDENTIFIER) {
 		Identifier* id = parseIdentifier();
