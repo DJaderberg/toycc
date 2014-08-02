@@ -236,6 +236,9 @@ class AlignmentSpecifier;
 class Enumerator;
 class EnumeratorList;
 class FunctionDefinition;
+class ParameterTypeList;
+class ParameterList;
+class ParameterDeclaration;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -277,6 +280,9 @@ class Parser {
 		AlignmentSpecifier* parseAlignmentSpecifier();
 		EnumeratorList* parseEnumeratorList();
 		FunctionDefinition* parseFunctionDefinition();
+		ParameterTypeList* parseParameterTypeList();
+		ParameterList* parseParameterList();
+		ParameterDeclaration* parseParameterDeclaration();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -694,7 +700,7 @@ class DeclaratorDirectDeclarator : public DirectDeclarator {
 			DirectDeclarator(next), decl(decl) {}
 		string getName() {
 			string ret = "";
-			if (decl != NULL) {ret += decl->getName();}
+			if (decl != NULL) {ret += "(" + decl->getName() + ")";}
 			if (next != NULL) {ret += next->getName();}
 			return ret;
 		}
@@ -722,6 +728,12 @@ class ParameterList : public NodeList<ParameterDeclaration> {
 		ParameterList(ParameterDeclaration* item, ParameterList* list) \
 			: NodeList(item, list) {}
 		ParameterList(ParameterDeclaration* item) : NodeList(item) {}
+		string getName() {
+			string ret = "";
+			if (item != NULL) {ret += item->getName();}
+			if (next != NULL) {ret += ", " + next->getName();}
+			return ret;
+		}
 };
 
 class ParameterTypeList : public Node {
@@ -743,10 +755,11 @@ class ParameterTypeList : public Node {
 		bool hasTrailing = false; //If list is ended with ', ...'
 };
 
-class DirectDeclaratorParameterTypeList : public DirectDeclarator {
+class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 	public:
-		DirectDeclaratorParameterTypeList(ParameterTypeList* params) : params(params) {}
-		virtual ~DirectDeclaratorParameterTypeList();
+		ParameterTypeListDirectDeclarator(ParameterTypeList* params) : params(params) {}
+		virtual ~ParameterTypeListDirectDeclarator();
+		string getName();
 	private:
 		ParameterTypeList* params = NULL;
 };

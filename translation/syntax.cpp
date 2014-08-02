@@ -19,8 +19,14 @@ string ParameterDeclaration :: getName() {
 	return ret;
 }
 
-DirectDeclaratorParameterTypeList :: ~DirectDeclaratorParameterTypeList() {
+ParameterTypeListDirectDeclarator :: ~ParameterTypeListDirectDeclarator() {
 	if (params != NULL) {delete params;}
+}
+
+string ParameterTypeListDirectDeclarator :: getName() {
+	string ret = "";
+	if (params != NULL) {ret += "(" + params->getName() + ")";}
+	return ret;
 }
 
 Declarator :: ~Declarator() {
@@ -667,19 +673,90 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 	DirectDeclarator* ret = NULL;
 	Token peek = source->peek();
 	if (peek.getName() == "(") {
+		//Can be Declarator, ParameterTypeList, or IdentifierList
+		//Currently only Declarator is implemented
 		source->get();
+		unsigned int bufferBefore = source->bufferSize();
 		Declarator* decl = parseDeclarator();
-		if (source->get().getName() == ")") {
+		unsigned int declUsed = source->bufferSize();
+		if (decl == NULL) {
+			declUsed = bufferBefore;
+		}
+		
+		source->setUsed(bufferBefore);
+		ParameterTypeList* paramTypeList = parseParameterTypeList();
+		unsigned int paramUsed = source->bufferSize();
+		if (paramTypeList == NULL) {
+			paramUsed = bufferBefore;
+		}
+		
+		if (declUsed > paramUsed) {
 			ret = new DeclaratorDirectDeclarator(decl);
+			source->setUsed(declUsed);
 		} else {
-			string err = "Expected ')' after declarator in direct declarator";
-			throw new DirectDeclaratorException(err);
+			ret = new ParameterTypeListDirectDeclarator(paramTypeList);
+			source->setUsed(paramUsed);
+		}
+		if (source->get().getName() != ")") {
+			string err = "Expected ')'";
+			throw new SyntaxException(err);
 		}
 	} else if (peek.getKey() == IDENTIFIER) {
-		ret = new IdentifierDirectDeclarator(parseIdentifier());
+		Identifier* id = parseIdentifier();
+		DirectDeclarator* next = parseDirectDeclarator();
+		ret = new IdentifierDirectDeclarator(id, next);
 	} else {
 		ret = NULL;
 	}
+	return ret;
+}
+
+ParameterTypeList* Parser :: parseParameterTypeList() {
+	ParameterTypeList* ret = NULL;
+	ParameterList* paramList = parseParameterList();
+	if (source->peek().getName() == ",") {
+		source->get();
+		int i = 0;
+		while (source->get().getName() == "." && i < 3) {
+			++i;
+		}
+		//If some dot not found
+		if (i < 3) {
+			string err = "Expected '...'";
+			throw new SyntaxException(err);
+		}
+		ret = new ParameterTypeList(paramList, true);
+	} else {
+		ret = new ParameterTypeList(paramList, false);
+	}
+	if (paramList == NULL) {
+			ret = NULL;
+	}
+	return ret;
+}
+
+ParameterList* Parser :: parseParameterList() {
+	ParameterList* ret = NULL;
+	ParameterDeclaration* paramDecl = NULL;
+	paramDecl = parseParameterDeclaration();
+	if (paramDecl == NULL) {
+		ret = NULL;
+	} else {
+		if (source->peek().getName() == ",") {
+			source->get();
+			ret = new ParameterList(paramDecl, parseParameterList());
+		} else {
+			ret = new ParameterList(paramDecl);
+		}
+	}
+	return ret;
+}
+
+ParameterDeclaration* Parser :: parseParameterDeclaration() {
+	ParameterDeclaration* ret = NULL;
+	DeclarationSpecifierList* declSpecList = parseDeclarationSpecifierList();
+	Declarator* decl = parseDeclarator();
+	ret = new ParameterDeclaration(declSpecList, decl);
 	return ret;
 }
 
@@ -693,6 +770,8 @@ Declaration* Parser :: parseDeclaration() {
 		Token token = source->peek(); //TODO: Check if this is okay
 		if (token.getName() != ";") {
 			return NULL;
+		} else {
+			source->get();
 		}
 	} catch (InitDeclaratorListException) {
 		//No problem, since the list is optional
