@@ -1,8 +1,31 @@
 #include "syntax.h"
 
+string ExternalDeclaration :: getName() {
+	string ret = "";
+	if (funcDef != NULL) {ret += funcDef->getName();}
+	if (decl != NULL) {ret += decl->getName();}
+	return ret;
+}
+
+ParameterDeclaration :: ~ParameterDeclaration() {
+	if (declSpecList != NULL) {delete declSpecList;}
+	if (decl != NULL) {delete decl;}
+}
+
+string ParameterDeclaration :: getName() {
+	string ret = "";
+	if (declSpecList != NULL) {ret += declSpecList->getName();}
+	if (decl != NULL) {ret += decl->getName();}
+	return ret;
+}
+
+DirectDeclaratorParameterTypeList :: ~DirectDeclaratorParameterTypeList() {
+	if (params != NULL) {delete params;}
+}
+
 Declarator :: ~Declarator() {
 	if (dirDecl != NULL) {delete dirDecl;}
-	/*if (pointer != NULL) {delete pointer;}*/
+	//if (pointer != NULL) {delete pointer;}
 }
 
 string Declarator :: getName() {
@@ -32,11 +55,50 @@ string BlockItem :: getName() {
 		list.push_back(ptr);
 	}
 	return new TranslationUnit(list);
-}
+}*/
 
 ExternalDeclaration* Parser :: parseExternalDeclaration() {
-	//TODO: Implement
-}*/
+	/* First, attempt to parse as a declaration, using the trailing ';' to 
+	 * determine if there was a match. If no match, reset the buffered source 
+	 * to its previous state and parse as a function declaration
+	 */
+	ExternalDeclaration* ret = NULL;
+	unsigned int bufferUsed = source->bufferSize();
+	DeclarationSpecifierList* declSpecList = parseDeclarationSpecifierList();
+	InitDeclaratorList* initDeclList = parseInitDeclaratorList();
+	Token token = source->peek();
+	if (token.getName() == ";") {
+		source->get();
+		Declaration* decl = new Declaration(declSpecList, initDeclList);
+		ret = new ExternalDeclaration(decl);
+	} else {
+		//Not a declaration, try a function definition instead
+		source->setUsed(bufferUsed);
+		FunctionDefinition* funcDef = parseFunctionDefinition();
+		ret = new ExternalDeclaration(funcDef);
+	}
+	return ret;
+}
+
+FunctionDefinition* Parser :: parseFunctionDefinition() {
+	FunctionDefinition* ret = NULL;
+	DeclarationSpecifierList* declSpecList = parseDeclarationSpecifierList();
+	if (declSpecList == NULL) {
+		return NULL;
+	}
+	Declarator* decl = parseDeclarator();
+	if (decl == NULL) {
+		return NULL;
+	}
+	DeclarationList* declList = NULL;
+	Token token = source->peek();
+	if (token.getName() != "{") {
+		declList = parseDeclarationList();
+	}
+	CompoundStatement* state = parseCompoundStatement();
+	ret = new FunctionDefinition(declSpecList, decl, declList, state);
+	return ret;
+}
 
 Statement* Parser :: parseStatement() {
 	Token current = source->peek();
@@ -383,6 +445,7 @@ DeclarationSpecifierList* Parser :: parseDeclarationSpecifierList() {
 }
 
 DeclarationSpecifier* Parser :: parseDeclarationSpecifier() {
+	//TODO: Implement struct-or-union-specifiers
 	DeclarationSpecifier* ret = NULL;
 	//Storage class specifiers
 	Token token = source->peek();
@@ -607,13 +670,13 @@ DirectDeclarator* Parser :: parseDirectDeclarator() {
 		source->get();
 		Declarator* decl = parseDeclarator();
 		if (source->get().getName() == ")") {
-			ret = new DirectDeclarator(decl);
+			ret = new DeclaratorDirectDeclarator(decl);
 		} else {
 			string err = "Expected ')' after declarator in direct declarator";
 			throw new DirectDeclaratorException(err);
 		}
 	} else if (peek.getKey() == IDENTIFIER) {
-		ret = new DirectDeclarator(parseIdentifier());
+		ret = new IdentifierDirectDeclarator(parseIdentifier());
 	} else {
 		ret = NULL;
 	}
@@ -627,6 +690,10 @@ Declaration* Parser :: parseDeclaration() {
 	InitDeclaratorList* initList = NULL;
 	try {
 		initList = parseInitDeclaratorList();
+		Token token = source->peek(); //TODO: Check if this is okay
+		if (token.getName() != ";") {
+			return NULL;
+		}
 	} catch (InitDeclaratorListException) {
 		//No problem, since the list is optional
 		ret = new Declaration(declList);
@@ -639,12 +706,22 @@ Declaration* Parser :: parseDeclaration() {
 	return ret;
 }
 
+DeclarationList* Parser :: parseDeclarationList() {
+	DeclarationList* list = NULL;
+	Declaration* item = parseDeclaration();
+	if (item != NULL) {
+		list = new DeclarationList(item, parseDeclarationList());
+	}
+	return list;
+}
+
 InitDeclaratorList* Parser :: parseInitDeclaratorList() {
 	InitDeclarator* first = NULL;
 	try {
 		first = parseInitDeclarator();
-		Token after = source->get();
+		Token after = source->peek();
 		if (after.getName() == ",") {
+			source->get();
 			return new InitDeclaratorList(first, parseInitDeclaratorList());
 		}
 	} catch (InitDeclaratorException) {

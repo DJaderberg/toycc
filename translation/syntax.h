@@ -215,6 +215,7 @@ class Identifier;
 class BlockItem;
 class BlockItemList;
 class Declaration;
+class DeclarationList;
 class InitDeclarator;
 class InitDeclaratorList;
 class Declarator;
@@ -234,6 +235,7 @@ class FunctionSpecifier;
 class AlignmentSpecifier;
 class Enumerator;
 class EnumeratorList;
+class FunctionDefinition;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -265,6 +267,7 @@ class Parser {
 		InitDeclarator* parseInitDeclarator();
 		InitDeclaratorList* parseInitDeclaratorList();
 		Declaration* parseDeclaration();
+		DeclarationList* parseDeclarationList();
 		DeclarationSpecifierList* parseDeclarationSpecifierList();
 		DeclarationSpecifier* parseDeclarationSpecifier();
 		StorageClassSpecifier* parseStorageClassSpecifier();
@@ -273,6 +276,7 @@ class Parser {
 		FunctionSpecifier* parseFunctionSpecifier();
 		AlignmentSpecifier* parseAlignmentSpecifier();
 		EnumeratorList* parseEnumeratorList();
+		FunctionDefinition* parseFunctionDefinition();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -390,6 +394,13 @@ class ExpressionException : public SyntaxException {
 };
 
 class ExternalDeclaration : public Node {
+	public:
+		ExternalDeclaration(FunctionDefinition* funcDef) : funcDef(funcDef) {}
+		ExternalDeclaration(Declaration* decl) : decl(decl) {}
+		string getName();
+	private:
+		FunctionDefinition* funcDef = NULL;
+		Declaration* decl = NULL;
 };
 
 class TranslationUnit : public Node {
@@ -616,7 +627,7 @@ class Declarator : public Node {
 		Declarator(DirectDeclarator* dirDecl, Pointer* pointer) : dirDecl(dirDecl), pointer(pointer) {}
 		virtual ~Declarator(); 
 		string getName();
-			private:
+	private:
 		DirectDeclarator* dirDecl = NULL;
 		Pointer* pointer = NULL;
 };
@@ -627,24 +638,117 @@ class DeclaratorException : public SyntaxException {
 		DeclaratorException(char * w) : SyntaxException(w) {}
 };
 
+//! Syntactic element direct-declarator
+/*!
+ * Each instance of DirectDeclarator is an element in a singly linked list,
+ * using the member 'next'. Each instance also holds an entry in the list, 
+ * which can be one of a few different things:
+ * 1. An Identifier
+ * 2. A Declarator within an enclosing pair of parenthesis
+ * 3. A ParameterTypeList within an enclosing pair of parenthesis
+ * 4. An optional IdentifierList within an enclosing pair of parenthesis
+ * 5-8. A TypeQualifierList and AssignmentExpression within an enclosing pair of brackets.
+ * Only 1 and 2 may occur at any point in the list, all others must be at the 
+ * end of the list.
+ * TODO: Implement 5-8
+ */
 class DirectDeclarator : public Node {
-	//TODO: Implement complicated versions
 	public:
-		DirectDeclarator(Identifier* id) : id(id), decl(NULL) {}
-		DirectDeclarator(Declarator* decl) : id(NULL), decl(decl) {}
+		DirectDeclarator() : next(NULL) {}
+		DirectDeclarator(DirectDeclarator* next) : next(next) {}
 		virtual ~DirectDeclarator() {
+			if (next != NULL) {delete next;}
+		}
+		virtual string getName() {
+			string ret = "";
+			if (next != NULL) {ret = next->getName();}
+			return ret;
+		}
+	protected:
+		DirectDeclarator* next = NULL;
+};
+
+class IdentifierDirectDeclarator : public DirectDeclarator {
+	public:
+		IdentifierDirectDeclarator(Identifier* id) : \
+			DirectDeclarator(NULL), id(id) {}
+		IdentifierDirectDeclarator(Identifier* id, DirectDeclarator* dirDecl) : \
+			DirectDeclarator(dirDecl), id(id) {}
+		string getName() {
+			string ret = "";
+			if (id != NULL) {ret += id->getName();}
+			if (next != NULL) {ret += next->getName();}
+			return ret;
+		}
+		virtual ~IdentifierDirectDeclarator() {
 			if (id != NULL) {delete id;}
+		}
+	private:
+		Identifier* id = NULL;
+};
+
+class DeclaratorDirectDeclarator : public DirectDeclarator {
+	public:
+		DeclaratorDirectDeclarator(Declarator* decl) : decl(decl) {}
+		DeclaratorDirectDeclarator(Declarator* decl, DirectDeclarator* next) : \
+			DirectDeclarator(next), decl(decl) {}
+		string getName() {
+			string ret = "";
+			if (decl != NULL) {ret += decl->getName();}
+			if (next != NULL) {ret += next->getName();}
+			return ret;
+		}
+		virtual ~DeclaratorDirectDeclarator() {
 			if (decl != NULL) {delete decl;}
+		}
+	private:
+		Declarator* decl = NULL;
+};
+
+
+class ParameterDeclaration : public Node {
+	//TODO: Implement abstract declarators
+	public:
+		ParameterDeclaration(DeclarationSpecifierList* declSpecList, Declarator* decl) : declSpecList(declSpecList), decl(decl) {}
+		virtual ~ParameterDeclaration();
+		string getName();
+	private:
+		DeclarationSpecifierList* declSpecList = NULL;
+		Declarator* decl = NULL;
+};
+
+class ParameterList : public NodeList<ParameterDeclaration> {
+	public:
+		ParameterList(ParameterDeclaration* item, ParameterList* list) \
+			: NodeList(item, list) {}
+		ParameterList(ParameterDeclaration* item) : NodeList(item) {}
+};
+
+class ParameterTypeList : public Node {
+	public:
+		ParameterTypeList(ParameterList* paramList) : paramList(paramList) {}
+		ParameterTypeList(ParameterList* paramList, bool hasTrailing) \
+			: paramList(paramList), hasTrailing(hasTrailing) {}
+		virtual ~ParameterTypeList() {
+			if (paramList != NULL) {delete paramList;}
 		}
 		string getName() {
 			string ret = "";
-			if (id != NULL) {ret = id->getName();}
-			if (decl != NULL) {ret = decl->getName();}
+			if (paramList != NULL) {ret += paramList->getName();}
+			if (hasTrailing) {ret += ", ...";}
 			return ret;
 		}
 	private:
-		Identifier* id;
-		Declarator* decl;
+		ParameterList* paramList = NULL;
+		bool hasTrailing = false; //If list is ended with ', ...'
+};
+
+class DirectDeclaratorParameterTypeList : public DirectDeclarator {
+	public:
+		DirectDeclaratorParameterTypeList(ParameterTypeList* params) : params(params) {}
+		virtual ~DirectDeclaratorParameterTypeList();
+	private:
+		ParameterTypeList* params = NULL;
 };
 
 class DirectDeclaratorException : public SyntaxException {
@@ -743,6 +847,44 @@ class Declaration : public Node {
 class DeclarationException : public SyntaxException {
 	DeclarationException(string w) : SyntaxException(w) {}
 	DeclarationException(char *w) : SyntaxException(w) {}
+};
+
+class DeclarationList : public NodeList<Declaration> {
+	public:
+		DeclarationList(Declaration* item) : NodeList(item) {}
+		DeclarationList(Declaration* item, DeclarationList* next) \
+			: NodeList(item, next) {}
+};
+
+class FunctionDefinition : public Node {
+	public:
+		FunctionDefinition(DeclarationSpecifierList* declSpecList, \
+				Declarator* decl, DeclarationList* declList, \
+				CompoundStatement* state) \
+			: declSpecList(declSpecList), decl(decl), declList(declList), \
+			state(state) {}
+		FunctionDefinition(DeclarationSpecifierList* declSpecList, \
+				Declarator* decl, CompoundStatement* state) \
+			: FunctionDefinition(declSpecList, decl, NULL, state) {}
+		string getName() {
+			string ret = "";
+			if (declSpecList != NULL) {ret += declSpecList->getName();}
+			if (decl != NULL) {ret += decl->getName();}
+			if (declList != NULL) {ret += declList->getName();}
+			if (state != NULL) {ret += state->getName();}
+			return ret;
+		}
+		virtual ~FunctionDefinition() {
+			if (declSpecList != NULL) {delete declSpecList;}
+			if (decl != NULL) {delete decl;}
+			if (declList != NULL) {delete declList;}
+			if (state != NULL) {delete state;}
+		}
+	private:
+		DeclarationSpecifierList* declSpecList = NULL;
+		Declarator* decl = NULL;
+		DeclarationList* declList = NULL; //Optional
+		CompoundStatement* state = NULL;
 };
 
 class TypeSpecifier : public DeclarationSpecifier {
@@ -1595,6 +1737,7 @@ class Generic : public PrefixOperator<Expression, &GenericOpStr, UNARY> {
 		Expression* expr = NULL;
 		GenericAssociationList* list = NULL;
 };
+
 
 
 

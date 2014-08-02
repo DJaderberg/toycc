@@ -8,6 +8,7 @@ int main(int argc, char *argv[]) {
 	} else {
 		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
 		filename = "/Users/David/toycc/test/expressions.c"; //Parsing
+		filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
 	}
 	try {
 	return translate(filename);
@@ -58,7 +59,8 @@ int translate(string filename) {
 	while (true) {
 		ptr = NULL;
 		if (bufParserSource->empty()) {break;}
-		Statement* ptr = parser->parseStatement();
+		//Statement* ptr = parser->parseStatement();
+		ExternalDeclaration* ptr = parser->parseExternalDeclaration();
 		if (ptr == NULL) {
 			cout << "Could not parse expression" << '\n';
 			return 0;
