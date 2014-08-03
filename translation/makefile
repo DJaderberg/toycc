@@ -7,6 +7,8 @@ all: translation
 translation: $(OBJECTS)
 	$(CC) -o translation $^ $(LDFLAGS)
 
+syntax.o : syntax.cpp syntax.h abstractSyntax.h
+	$(CC) -c $(CFLAGS) $<
 %.o: %.cpp %.h
 	$(CC) -c $(CFLAGS) $<
 
