@@ -6,6 +6,20 @@
 
 using namespace std;
 
+//! A type of exception relating input/output operations
+class IOException : public runtime_error {
+	public:
+		IOException(string w) : runtime_error(w) {}
+		IOException(char* w) : runtime_error(w) {}
+};
+
+class SyntaxException : public runtime_error {
+	public:
+		SyntaxException(string w) : runtime_error(w) {}
+		SyntaxException(char* w) : runtime_error(w) {}
+};
+
+
 template<class T>
 class Source
 {
@@ -72,6 +86,7 @@ class BufferedSource : public Source<T> {
 		bool empty() {return source->empty();}
 		virtual ~BufferedSource() {}
 		unsigned int bufferSize() {return used;}
+		void setUsed(unsigned int in) {this->used = in;}
 	private:
 		unsigned int used;
 		Source<T>* source;

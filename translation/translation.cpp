@@ -6,7 +6,9 @@ int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		filename = argv[1];
 	} else {
-		filename = "/Users/David/toycc/test/include.c";
+		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
+		filename = "/Users/David/toycc/test/expressions.c"; //Parsing
+		filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
 	}
 	try {
 	return translate(filename);
@@ -18,7 +20,9 @@ int main(int argc, char *argv[]) {
 	} catch (runtime_error& error) {
 		cout << "Error: " << error.what() << "\n";
 		return 1;
-	} 
+	} catch (...) {
+		cout << "Unknown exception" << '\n';
+	}
 }
 
 int translate(string filename) {
@@ -48,7 +52,26 @@ int translate(string filename) {
 	BufferedSource<Token>* bufStrLitConCatSource = new BufferedSource<Token>\
 												   (whitespacecleaner);
 	StrLitConCat* strlitconcat = new StrLitConCat(*bufStrLitConCatSource);
+	BufferedSource<Token>* bufParserSource = new BufferedSource<Token>\
+											 (strlitconcat);
+	Parser* parser = new Parser(bufParserSource);
+	Expression* ptr = NULL;
 	while (true) {
+		ptr = NULL;
+		if (bufParserSource->empty()) {break;}
+		//Statement* ptr = parser->parseStatement();
+		ExternalDeclaration* ptr = parser->parseExternalDeclaration();
+		if (ptr == NULL) {
+			cout << "Could not parse expression" << '\n';
+			return 0;
+		} else {
+			cout << ptr->getName() << '\n';
+		}
+		parser->getSource()->clearUsed();
+	}
+		
+	//Tokenization printing code
+	/*while (true) {
 		Token token = strlitconcat->get();
 		string current = token.getName();
 		TokenKey key = token.getKey();
@@ -61,7 +84,7 @@ int translate(string filename) {
 		{
 			break;
 		}
-	}
+	}*/
 	return 0;
 }
 

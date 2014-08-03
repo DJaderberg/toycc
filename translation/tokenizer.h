@@ -36,6 +36,7 @@ class Token {
 										   : position(pos), name(name), id(id) {}
 		unsigned int getLine() {return position.getLine();}
 		unsigned int getColumn() {return position.getColumn();}
+		Position getPosition() {return position;}
 		const string getName() {return name;}
 		TokenKey getKey() {return id;};
 	private:
