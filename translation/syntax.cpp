@@ -496,6 +496,17 @@ DeclarationSpecifier* Parser :: parseDeclarationSpecifier() {
 			if (source->peek(1).getName() == "(") {
 				return parseTypeSpecifier();
 			}
+		//Struct or Union Specifiers
+		} else if (token.getName() == "struct") {
+			source->get();
+			ret = new StructSpecifier(token);
+			ret->parse(this);
+			return ret;
+		} else if (token.getName() == "union") {
+			source->get();
+			ret = new UnionSpecifier(token);
+			ret->parse(this);
+			return ret;
 		} else {
 			return parseTypeSpecifier();
 		}
@@ -504,6 +515,17 @@ DeclarationSpecifier* Parser :: parseDeclarationSpecifier() {
 	search = this->mAlignmentSpecifier.find(token.getName());
 	if (search != this->mAlignmentSpecifier.end()) {
 		return parseAlignmentSpecifier();
+	}
+
+	//Struct or Union Specifiers
+	if (token.getName() == "struct") {
+		ret = new StructSpecifier(token);
+		ret->parse(this);
+		return ret;
+	} else if (token.getName() == "union") {
+		ret = new UnionSpecifier(token);
+		ret->parse(this);
+		return ret;
 	}
 	return ret;
 
@@ -580,6 +602,90 @@ AlignmentSpecifier* Parser :: parseAlignmentSpecifier() {
 	if (search != mAlignmentSpecifier.end()) {
 		ret = new AlignmentSpecifier(token);
 		ret->parse(this);
+	}
+	return ret;
+}
+
+DeclarationSpecifier* Parser :: parseStructOrUnionSpecifier() {
+	DeclarationSpecifier* ret = NULL;
+	Token token = source->get();
+	if (token.getName() == "struct") {
+		ret = new StructSpecifier(token);
+	} else if (token.getName() == "union") {
+		ret = new UnionSpecifier(token);
+	} else {
+		ret = NULL;
+	}
+	if (ret != NULL) {
+		ret->parse(this);
+	} return ret;
+}
+
+SpecifierQualifierList* Parser :: parseSpecifierQualifierList() {
+	SpecifierQualifierList* ret = NULL;
+	SpecifierQualifierList* next = NULL;
+	Token token = source->peek();
+	auto search = mTypeSpecifier.find(token.getName());
+	if (search != mTypeSpecifier.end()) {
+		source->get();
+		TypeSpecifier* spec = new TypeSpecifier(token);
+		next = parseSpecifierQualifierList();
+		return new SpecifierQualifierList(spec, next);
+	}
+	search = mTypeQualifier.find(token.getName());
+	if (search != mTypeQualifier.end()) {
+		source->get();
+		TypeQualifier* qual = new TypeQualifier(token);
+		next = parseSpecifierQualifierList();
+		return new SpecifierQualifierList(qual, next);
+	}
+	return ret;
+}
+
+StructDeclarator* Parser :: parseStructDeclarator() {
+	Declarator* decl = parseDeclarator();
+	Expression* expr = NULL;
+	if (source->peek().getName() == ":") {
+		source->get();
+		expr = parseExpression(CONDITIONAL);
+	} else if (decl == NULL) {
+		return NULL;
+	}
+	return new StructDeclarator(decl, expr);
+}
+
+StructDeclaratorList* Parser :: parseStructDeclaratorList() {
+	StructDeclaratorList* ret = NULL;
+	StructDeclarator* item = parseStructDeclarator();
+	if (item == NULL) {
+		ret = NULL;
+	} else {
+		StructDeclaratorList* next = parseStructDeclaratorList();
+		ret = new StructDeclaratorList(item, next);
+	}
+	return ret;
+}
+
+StructDeclaration* Parser :: parseStructDeclaration() {
+	SpecifierQualifierList* specQualList = parseSpecifierQualifierList();
+	StructDeclaratorList* structDeclList = parseStructDeclaratorList();
+	if (source->peek().getName() == ";") {
+		source->get();
+		return new StructDeclaration(specQualList, structDeclList);
+	} else if (specQualList == NULL) {
+		return NULL;
+	}
+	return new StructDeclaration(specQualList, structDeclList);
+}
+
+StructDeclarationList* Parser :: parseStructDeclarationList() {
+	StructDeclarationList* ret = NULL;
+	StructDeclaration* item = parseStructDeclaration();
+	if (item == NULL) {
+		ret = NULL;
+	} else {
+		StructDeclarationList* next = parseStructDeclarationList();
+		ret = new StructDeclarationList(item, next);
 	}
 	return ret;
 }
@@ -674,7 +780,11 @@ Declarator* Parser :: parseDeclarator() {
 	DirectDeclarator* dirDecl = NULL;
 	try {
 		dirDecl = parseDirectDeclarator();
-		ret = new Declarator(dirDecl, ptr);
+		if (dirDecl == NULL) {
+			ret = NULL;
+		} else {
+			ret = new Declarator(dirDecl, ptr);
+		}
 	} catch (DirectDeclaratorException& error) {
 		string err = "Could not parse direct declarator in declarator";
 		throw new DeclaratorException(err);

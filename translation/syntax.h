@@ -241,6 +241,11 @@ class ParameterTypeList;
 class ParameterList;
 class ParameterDeclaration;
 class TypeQualifierList;
+class StructDeclarationList;
+class StructDeclaration;
+class SpecifierQualifierList;
+class StructDeclaratorList;
+class StructDeclarator;
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -289,6 +294,12 @@ class Parser {
 		IdentifierList* parseIdentifierList();
 		Pointer* parsePointer();
 		TypeQualifierList* parseTypeQualifierList();
+		DeclarationSpecifier* parseStructOrUnionSpecifier();
+		StructDeclarationList* parseStructDeclarationList();
+		StructDeclaration* parseStructDeclaration();
+		SpecifierQualifierList* parseSpecifierQualifierList();
+		StructDeclaratorList* parseStructDeclaratorList();
+		StructDeclarator* parseStructDeclarator();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -1131,6 +1142,127 @@ class AlignmentSpecifier : public DeclarationSpecifier {
 		Token type;
 		Expression* constExpr = NULL;
 };
+
+class StructDeclarator : public Node {
+	public:
+		StructDeclarator(Declarator* decl) : decl(decl) {}
+		StructDeclarator(Expression* expr) : expr(expr) {}
+		StructDeclarator(Declarator* decl, Expression* expr) : decl(decl), \
+			expr(expr) {}
+		string getName() {
+			string ret = "";
+			if (decl != NULL) {ret += decl->getName();}
+			if (expr != NULL) {ret += ":" + expr->getName();}
+			return ret;
+		}
+	private:
+		Declarator* decl = NULL;
+		Expression* expr = NULL;
+};
+
+class StructDeclaratorList : public NodeList<StructDeclarator> {
+	public:
+		StructDeclaratorList(StructDeclarator* item) : NodeList(item) {}
+		StructDeclaratorList(StructDeclarator* item, StructDeclaratorList* next)\
+			: NodeList(item, next) {}
+		virtual string getName() {
+			string ret = "";
+			if (item != NULL) {ret += item->getName();}
+			if (next != NULL) {ret += next->getName();}
+			return ret;
+		}
+};
+
+class SpecifierQualifierList : public Node {
+	public:
+		SpecifierQualifierList(TypeSpecifier* spec) : spec(spec) {}
+		SpecifierQualifierList(TypeQualifier* qual) : qual(qual) {}
+		SpecifierQualifierList(TypeSpecifier* spec, SpecifierQualifierList* next) : spec(spec), next(next) {}
+		SpecifierQualifierList(TypeQualifier* qual, SpecifierQualifierList* next) : qual(qual), next(next) {}
+		string getName() {
+			string ret = "";
+			if (spec != NULL) {ret += spec->getName();}
+			if (qual != NULL) {ret += qual->getName();}
+			if (next != NULL) {ret += " " + next->getName();}
+			return ret;
+		}
+	private:
+		TypeSpecifier* spec = NULL;
+		TypeQualifier* qual = NULL;
+		SpecifierQualifierList* next = NULL;
+};
+
+class StructDeclaration : public Node {
+	public:
+		StructDeclaration(SpecifierQualifierList* specQualList) : \
+			specQualList(specQualList) {}
+		StructDeclaration(SpecifierQualifierList* specQualList, StructDeclaratorList* structDeclList) : specQualList(specQualList), \
+   structDeclList(structDeclList) {}
+		string getName() {
+			string ret = "";
+			if (specQualList != NULL) {ret += specQualList->getName();}
+			if (structDeclList != NULL) {
+				ret += " " + structDeclList->getName() + ";";
+			}
+			return ret;
+		}
+		virtual ~StructDeclaration() {
+			if (specQualList != NULL) {delete specQualList;}
+			if (structDeclList != NULL) {delete structDeclList;}
+		}
+	private:
+		SpecifierQualifierList* specQualList = NULL;
+		StructDeclaratorList* structDeclList = NULL;
+};
+
+class StructDeclarationList : public NodeList<StructDeclaration> {
+	public:
+		StructDeclarationList(StructDeclaration* item) : NodeList(item) {}
+		StructDeclarationList(StructDeclaration* item, StructDeclarationList* next) : NodeList(item, next) {}
+};
+
+class StructSpecifier : public DeclarationSpecifier {
+	public:
+		StructSpecifier(Token name) : DeclarationSpecifier(name) {}
+		virtual string getName() {
+			string ret = DeclarationSpecifier::getName() + " ";
+			if (id != NULL) {ret += id->getName();}
+			ret += " {\n";
+			if (list != NULL) {ret += list->getName();}
+			ret += "\n}";
+			return ret;
+		}
+		void parse(Parser* parser) {
+			Token token = parser->getSource()->peek();
+			if (token.getKey() == IDENTIFIER) {
+				id = new Identifier(token);
+				parser->getSource()->get();
+			}
+			token = parser->getSource()->peek();
+			if (token.getName() == "{") {
+				parser->getSource()->get();
+				list = parser->parseStructDeclarationList();
+				token = parser->getSource()->get();
+				if (token.getName() != "}") {
+					string err = "Expected '}' to end struct or union specifier";
+					throw new SyntaxException(err);
+				}
+			}
+		}
+	private:
+		Identifier* id = NULL; //Optional
+		StructDeclarationList* list = NULL; //Optional
+};
+
+class UnionSpecifier : public StructSpecifier {
+	public:
+		UnionSpecifier(Token name) : StructSpecifier(name) {}
+};
+
+
+
+
+
 
 
 
