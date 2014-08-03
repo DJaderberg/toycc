@@ -375,12 +375,11 @@ class ExternalDeclaration : public Node {
 		Declaration* decl = NULL;
 };
 
-class TranslationUnit : public Node {
+class TranslationUnit : public NodeList<ExternalDeclaration> {
 	public:
-		TranslationUnit(list<ExternalDeclaration*>& list) : list(list) {}
-		list<ExternalDeclaration*>& getList() {return this->list;}
-	private:
-		list<ExternalDeclaration*>& list;
+		TranslationUnit(ExternalDeclaration* decl, TranslationUnit* next) : \
+			NodeList(decl, next) {}
+		TranslationUnit(ExternalDeclaration* decl) : NodeList(decl) {}
 };
 
 class Statement : public Node {

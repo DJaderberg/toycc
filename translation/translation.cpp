@@ -60,7 +60,7 @@ int translate(string filename) {
 		ptr = NULL;
 		if (bufParserSource->empty()) {break;}
 		//Statement* ptr = parser->parseStatement();
-		ExternalDeclaration* ptr = parser->parseExternalDeclaration();
+		TranslationUnit* ptr = parser->parseTranslationUnit();
 		if (ptr == NULL) {
 			cout << "Could not parse expression" << '\n';
 			return 0;
