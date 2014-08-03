@@ -9,6 +9,7 @@ translation: $(OBJECTS)
 
 syntax.o : syntax.cpp syntax.h abstractSyntax.h
 	$(CC) -c $(CFLAGS) $<
+
 %.o: %.cpp %.h
 	$(CC) -c $(CFLAGS) $<
 

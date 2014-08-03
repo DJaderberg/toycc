@@ -65,14 +65,18 @@ Pointer :: ~Pointer() {
 	if (next != NULL) {delete next;}
 }
 
-/*TranslationUnit* Parser :: parseTranslationUnit() {
-	list<ExternalDeclaration*> list;
-	ExternalDeclaration* ptr;
-	while ((ptr = parseExternalDeclaration())) {
-		list.push_back(ptr);
+TranslationUnit* Parser :: parseTranslationUnit() {
+	TranslationUnit* ret = NULL;
+	ExternalDeclaration* decl = NULL;
+	decl = parseExternalDeclaration();
+	if (decl == NULL) {
+		return NULL;
+	} else {
+		TranslationUnit* next = parseTranslationUnit();
+		ret = new TranslationUnit(decl, next);
 	}
-	return new TranslationUnit(list);
-}*/
+	return ret;
+}
 
 ExternalDeclaration* Parser :: parseExternalDeclaration() {
 	/* First, attempt to parse as a declaration, using the trailing ';' to 
@@ -92,7 +96,9 @@ ExternalDeclaration* Parser :: parseExternalDeclaration() {
 		//Not a declaration, try a function definition instead
 		source->setUsed(bufferUsed);
 		FunctionDefinition* funcDef = parseFunctionDefinition();
-		ret = new ExternalDeclaration(funcDef);
+		if (funcDef != NULL) {
+			ret = new ExternalDeclaration(funcDef);
+		}
 	}
 	return ret;
 }
