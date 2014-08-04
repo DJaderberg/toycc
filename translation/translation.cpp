@@ -77,8 +77,11 @@ int translate(string filename) {
 			cout << "Type check: " << ptr->typeCheck(scope) << '\n';
 			cout << ptr->getName() << '\n';
 			//cout << ptr->getType(scope)->getName() << '\n';
+			Type* typeOfA = scope->find("a");
+			cout << typeOfA->getName() << '\n';
+			Type* typeOfB = scope->find("b");
+			cout << typeOfB->getName() << '\n';
 		}
-		parser->getSource()->clearUsed();
 	}
 		
 	//Tokenization printing code

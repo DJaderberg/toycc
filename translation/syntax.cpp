@@ -1162,8 +1162,12 @@ Type* DeclarationSpecifierList :: getType(Scope* s) {
 	//Add all type specifiers to the string
 	while ((curTypeSpec = dynamic_cast<TypeSpecifier*>(curItem))) {
 		basicTypeName += curTypeSpec->getName();
-		curItem = curNext->getItem();
-		curNext = curNext->getNext();
+		if (curNext != NULL) {
+			curItem = curNext->getItem();
+			curNext = curNext->getNext();
+		} else {
+			break;
+		}
 	}
 	auto search = mBasicTypes.find(basicTypeName);
 	if (search != mBasicTypes.end()) {

@@ -1,4 +1,4 @@
-int a = 0, b = 0;
+int a,b;
 int sum = a + b; //Comment
 int mult = 0;
 void function(void) {

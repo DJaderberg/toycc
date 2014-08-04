@@ -387,7 +387,7 @@ class ExternalDeclaration : public Node {
 		ExternalDeclaration(FunctionDefinition* funcDef) : funcDef(funcDef) {}
 		ExternalDeclaration(Declaration* decl) : decl(decl) {}
 		string getName();
-		virtual bool typeCheck(Scope* s);
+		bool typeCheck(Scope* s);
 	private:
 		FunctionDefinition* funcDef = NULL;
 		Declaration* decl = NULL;
@@ -904,14 +904,15 @@ class Declaration : public Node {
 					//Enter all declarations into the current scope
 					//First, get the type that they should have
 					Type* type = declList->getType(s);
-					DeclarationSpecifier* declSpec = NULL;
-					NodeList<DeclarationSpecifier>* declListTemp = declList;
-					while ((declSpec = declList->getItem()) != NULL && \
-							(declListTemp = declList->getNext()) != NULL)  {
-						s->insert(declSpec->getName(), type);
+					InitDeclarator* initDecl = NULL;
+					NodeList<InitDeclarator>* initListTemp = initList;
+					while ((initDecl = initListTemp->getItem()) != NULL && \
+							initListTemp->getNext() != NULL)  {
+						initListTemp = initListTemp->getNext();
+						s->insert(initDecl->getName(), type);
 					}
-					if ((declSpec = declList->getItem()) != NULL) {
-						s->insert(declSpec->getName(), type);
+					if ((initDecl = initList->getItem()) != NULL) {
+						s->insert(initDecl->getName(), type);
 					}
 					return true;
 				}

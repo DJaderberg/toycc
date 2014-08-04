@@ -385,9 +385,11 @@ class Scope {
 			if (table != NULL) {
 				Type* localSearch = table->find(key);
 				if (localSearch == NULL) {
-					Type* globalSearch = enclosing->find(key);
-					if (globalSearch != NULL) {
-						ret = globalSearch;
+					if (enclosing != NULL) {
+						Type* globalSearch = enclosing->find(key);
+						if (globalSearch != NULL) {
+							ret = globalSearch;
+						}
 					}
 				} else {
 					ret = localSearch;
@@ -425,7 +427,7 @@ bool NodeList<T> :: typeCheck(Scope* s) {
 	if (next == NULL) {
 		return true;
 	} else {
-		return next->typeCheck(s, item->getType(s));
+		return item->typeCheck(s) && next->typeCheck(s, item->getType(s));
 	}
 }
 
@@ -434,7 +436,7 @@ bool NodeList<T> :: typeCheck(Scope* s, Type* t) {
 	if (next == NULL) {
 		return *t == *item->getType(s);
 	} else {
-		return *t == *item->getType(s) && next->typeCheck(s, t);
+		return item->typeCheck(s) && *t == *item->getType(s) && next->typeCheck(s, t);
 	}
 }
 
