@@ -8,7 +8,7 @@ int main(int argc, char *argv[]) {
 	} else {
 		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
 		filename = "/Users/David/toycc/test/expressions.c"; //Parsing
-		filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
+		//filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
 	}
 	try {
 	return translate(filename);
@@ -26,6 +26,13 @@ int main(int argc, char *argv[]) {
 }
 
 int translate(string filename) {
+	Type* testInt = new BasicType(INT);
+	Type* testDouble = new BasicType(DOUBLE);
+	TypeList* testTypeListLast = new TypeList(*testDouble);
+	TypeList* testTypeListFirst = new TypeList(*testInt, testTypeListLast);
+	Type* testType = new StructType(testTypeListFirst);
+	cout << "Size of struct: " << testType->getSize() << '\n';
+	
 	ifstream filestream = ifstream(filename);
 	stringstream stream1to2 = stringstream(std::ios_base::in
                               | std::ios_base::out

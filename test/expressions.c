@@ -1,5 +1,9 @@
-sum = a + b; //Comment
+int a = 0, b = 0;
+int sum = a + b; //Comment
+int mult = 0;
+void function(void) {
 mult *= a - b;
+}
 div /= a - b;
 mod %= a -b;
 add += a - b;
