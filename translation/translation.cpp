@@ -28,8 +28,8 @@ int main(int argc, char *argv[]) {
 int translate(string filename) {
 	Type* testInt = new BasicType(INT);
 	Type* testDouble = new BasicType(DOUBLE);
-	TypeList* testTypeListLast = new TypeList(*testDouble);
-	TypeList* testTypeListFirst = new TypeList(*testInt, testTypeListLast);
+	TypeList* testTypeListLast = new TypeList(testDouble);
+	TypeList* testTypeListFirst = new TypeList(testInt, testTypeListLast);
 	Type* testType = new StructType(testTypeListFirst);
 	cout << "Size of struct: " << testType->getSize() << '\n';
 	
@@ -68,11 +68,15 @@ int translate(string filename) {
 		if (bufParserSource->empty()) {break;}
 		//Statement* ptr = parser->parseStatement();
 		TranslationUnit* ptr = parser->parseTranslationUnit();
+		
 		if (ptr == NULL) {
 			cout << "Could not parse expression" << '\n';
 			return 0;
 		} else {
+			Scope* scope = new Scope();
+			cout << "Type check: " << ptr->typeCheck(scope) << '\n';
 			cout << ptr->getName() << '\n';
+			//cout << ptr->getType(scope)->getName() << '\n';
 		}
 		parser->getSource()->clearUsed();
 	}

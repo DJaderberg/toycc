@@ -1132,3 +1132,60 @@ void Parser :: declarationSpecifiers() {
 	this->mAlignmentSpecifier["_Alignas"] = "_Alignas";
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+//Type checking
+
+
+bool ExternalDeclaration :: typeCheck(Scope* s) {
+	if (funcDef != NULL) return funcDef->typeCheck(s);
+	if (decl != NULL) return decl->typeCheck(s);
+	return false;
+}
+
+Type* DeclarationSpecifierList :: getType(Scope* s) {
+	Type* ret = NULL;
+	string basicTypeName = "";
+	DeclarationSpecifier* curItem = item;
+	NodeList<DeclarationSpecifier>* curNext = next;
+	TypeSpecifier* curTypeSpec = NULL;
+	//Add all type specifiers to the string
+	while ((curTypeSpec = dynamic_cast<TypeSpecifier*>(curItem))) {
+		basicTypeName += curTypeSpec->getName();
+		curItem = curNext->getItem();
+		curNext = curNext->getNext();
+	}
+	auto search = mBasicTypes.find(basicTypeName);
+	if (search != mBasicTypes.end()) {
+		ret = new BasicType(search->second);
+	}
+	return ret;
+}
+
+map<string, BasicTypeEnum> DeclarationSpecifierList :: mBasicTypes \
+		= DeclarationSpecifierList::initBasicTypesMap();
+
+map<string, BasicTypeEnum> DeclarationSpecifierList :: initBasicTypesMap() {
+	map<string, BasicTypeEnum> ret = {\
+		{"_Bool", _BOOL}, {"char", CHAR}, {"signed char", SIGNED_CHAR}, \
+		{"unsigned char", UNSIGNED_CHAR}, {"short int", SHORT_INT}, \
+		{"unsigned short int", UNSIGNED_SHORT_INT}, {"int", INT}, \
+		{"unsigned int", UNSIGNED_INT}, {"long int", LONG_INT}, \
+		{"unsigned long int", UNSIGNED_LONG_INT}, \
+		{"long long int", LONG_LONG_INT}, \
+		{"unsigned long long int", UNSIGNED_LONG_LONG_INT}, \
+		{"float", FLOAT}, {"double", DOUBLE}, {"long double", LONG_DOUBLE}\
+	};
+	return ret;
+}
+

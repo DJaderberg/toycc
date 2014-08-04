@@ -13,6 +13,23 @@ class PrefixOperator : public Operator {
 			if (expr != NULL) {ret += expr->getName();}
 			return ret;
 		}
+		Type* getType(Scope* s) {
+			if (opStr == "&") {
+				return new PointerType(expr->getType(s));
+			} else if (opStr == "*") {
+				//Magic wand of dereference, downcast expr->getType() to a 
+				//PointerType and return pointeeType
+				if (PointerType* downcast = \
+						dynamic_cast<PointerType*>(expr->getType(s))) {
+					return downcast->getPointeeType();
+				} else {
+					string err = "Dereference (prefix operator '*' requires a "\
+								  "pointer type";
+					throw new TypeError(err);
+				}
+			}
+			return expr->getType(s);
+		}
 		void parse(Parser* parser);
 	private:
 		Op* expr = NULL; //The item to operate on
@@ -370,6 +387,7 @@ class ExternalDeclaration : public Node {
 		ExternalDeclaration(FunctionDefinition* funcDef) : funcDef(funcDef) {}
 		ExternalDeclaration(Declaration* decl) : decl(decl) {}
 		string getName();
+		virtual bool typeCheck(Scope* s);
 	private:
 		FunctionDefinition* funcDef = NULL;
 		Declaration* decl = NULL;
@@ -837,17 +855,27 @@ class DeclarationSpecifier : public Node {
 
 class DeclarationSpecifierList : public NodeList<DeclarationSpecifier> {
 	public:
-		DeclarationSpecifierList(DeclarationSpecifier* item, DeclarationSpecifierList* next) : NodeList(item, next) {}
+		DeclarationSpecifierList(DeclarationSpecifier* item, DeclarationSpecifierList* next) : NodeList(item, next) {
+			if (mBasicTypes.empty()) {
+				initBasicTypesMap();
+			}
+		}
 		string getName() {
 			string ret = "";
 			if (item != NULL) {ret += item->getName() + " ";}
 			if (next != NULL) {ret += next->getName();}
 			return ret;
 		}
+		//TODO: Implement getType here, which will be the meat of insertion of 
+		//new variables
+		Type* getType(Scope* s); //Currently supports basic types
+		static map<string, BasicTypeEnum> initBasicTypesMap();
+	private:
+		static map<string, BasicTypeEnum> mBasicTypes;
 };
 
 class Declaration : public Node {
-	//TODO: Implement Declaration specifiers and static_assert declarations
+	//TODO: Implement static_assert declarations
 	public:
 		Declaration() : initList(NULL) {}
 		Declaration(InitDeclaratorList* initList) : initList(initList) {}
@@ -860,6 +888,34 @@ class Declaration : public Node {
 			if (initList != NULL) {ret += initList->getName();}
 			ret += ";";
 			return ret;
+		}
+		Type* getType(Scope* s) {
+			return declList->getType(s);
+		}
+		bool typeCheck(Scope* s) {
+			if (declList == NULL || initList == NULL) {
+				return false;
+			} else {
+				//Make sure we are not redeclaraing anything. 
+				//initList->typeCheck(s) will do this for us
+				if (!initList->typeCheck(s)) {
+					return false;
+				} else {
+					//Enter all declarations into the current scope
+					//First, get the type that they should have
+					Type* type = declList->getType(s);
+					DeclarationSpecifier* declSpec = NULL;
+					NodeList<DeclarationSpecifier>* declListTemp = declList;
+					while ((declSpec = declList->getItem()) != NULL && \
+							(declListTemp = declList->getNext()) != NULL)  {
+						s->insert(declSpec->getName(), type);
+					}
+					if ((declSpec = declList->getItem()) != NULL) {
+						s->insert(declSpec->getName(), type);
+					}
+					return true;
+				}
+			}
 		}
 	private:
 		DeclarationSpecifierList* declList = NULL;
@@ -1928,4 +1984,6 @@ void TernaryOperator<Left, Middle, Right, opStrFirst, opStrSecond, prioTemp> :: 
 		throw new SyntaxException(err);
 	}
 }
+
+
 
