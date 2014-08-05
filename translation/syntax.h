@@ -95,6 +95,23 @@ class BinaryOperator : public InfixOperator {
 			}
 			return ret;
 		}
+		virtual bool typeCheck(Scope* s) {
+			Type* lhsT = lhs->getType(s);
+			Type* rhsT = rhs->getType(s);
+			if (lhsT == NULL || rhsT == NULL) {
+				return false;
+			}
+			if (*lhsT != *rhsT) {
+				string err = "Mismatched types '" + lhsT->getName() + "' and '" + \
+							  rhsT->getName() + "' in binary operator " + \
+							  this->getName();
+				throw new TypeError(err);
+			}
+			return rhs->typeCheck(s) && lhs->typeCheck(s);
+		}
+		virtual Type* getType(Scope* s) {
+			return lhs->getType(s);
+		}
 		void parse(Parser* parser);
 	protected:
 		Op* rhs = NULL; //The right hand side 
@@ -275,7 +292,15 @@ class Identifier : public Node {
 		Identifier(Token token) : token(token) {}
 		string getName() {return token.getName();}
 		virtual ~Identifier() {}
-	private:
+		bool typeCheck(Scope* s) {return true;}
+		Type* getType(Scope* s) {
+			Type* search = s->find(this->getName());
+			if (search == NULL) {
+				return new NoType();
+			} 
+			return search;
+		}
+	protected:
 		Token token;
 };
 
@@ -302,6 +327,9 @@ class Constant : public Identifier {
 	public:
 		Constant(Token token) : Identifier(token) {}
 		virtual ~Constant() {}
+		Type* getType(Scope* s) {return this->getType(token.getName());}
+		static Type* getType(string str); //ints and doubles only
+		bool typeCheck(Scope* s) {return true;}
 };
 
 class EnumerationConstant : public Constant {
@@ -327,6 +355,8 @@ class IdentifierExpression : public Expression {
 		}
 		string getName() {return identifier->getName();}
 		void parse(Parser* parser) {}
+		bool typeCheck(Scope* s) {return identifier->typeCheck(s);}
+		Type* getType(Scope* s) {return identifier->getType(s);}
 	private:
 		Identifier* identifier = NULL;
 };
@@ -357,6 +387,8 @@ class ConstantExpression : public Expression {
 		}
 		string getName() {return constant->getName();}
 		void parse(Parser* parser) {}
+		Type* getType(Scope* s) {return constant->getType(s);}
+		bool typeCheck(Scope* s) {return constant->typeCheck(s);}
 	private:
 		Constant* constant = NULL;
 };
@@ -412,6 +444,8 @@ class BlockItem : public Node {
 		BlockItem(Statement* state) : state(state) {}
 		virtual ~BlockItem();
 		string getName();
+		bool typeCheck(Scope* s); 
+		Type* getType(Scope* s);
 	private:
 		Declaration* decl = NULL;
 		Statement* state = NULL;
@@ -448,6 +482,15 @@ class CompoundStatement : public Statement {
 			ret += "\n}";
 			return ret;
 		}
+		virtual Type* getType(Scope* s) {
+			return new NoType();
+		}
+		virtual bool typeCheck(Scope* s) {
+			Scope* localScope = new Scope(s);
+			bool ret = itemList->typeCheck(localScope);
+			delete localScope;
+			return ret;
+		}
 	private:
 		BlockItemList* itemList; //Optional, may be NULL
 
@@ -462,6 +505,12 @@ class ExpressionStatement : public Statement {
 			if (expression != NULL) {ret += expression->getName();}
 			ret += ";";
 			return ret;
+		}
+		virtual Type* getType(Scope* s) {
+			return expression->getType(s);
+		}
+		virtual bool typeCheck(Scope* s) {
+			return expression->typeCheck(s);
 		}
 	private:
 		Expression* expression = NULL; //Optional
@@ -624,7 +673,6 @@ class Pointer : public Node {
 };
 
 class Declarator : public Node {
-	//TODO: Implement the optional Pointer here
 	public:
 		Declarator(DirectDeclarator* dirDecl) : dirDecl(dirDecl), pointer(NULL) {}
 		Declarator(DirectDeclarator* dirDecl, Pointer* pointer) : dirDecl(dirDecl), pointer(pointer) {}
@@ -671,6 +719,7 @@ class DirectDeclarator : public Node {
 			return ret;
 		}
 		virtual bool insert(Scope* s, Type* t) {return false;}
+		DirectDeclarator* getNext() {return next;}
 	protected:
 		DirectDeclarator* next = NULL;
 };
@@ -698,6 +747,7 @@ class IdentifierDirectDeclarator : public DirectDeclarator {
 				return false;
 			}
 		}
+		Identifier* getIdentifier() {return id;}
 	private:
 		Identifier* id = NULL;
 };
@@ -727,10 +777,18 @@ class ParameterDeclaration : public Node {
 		ParameterDeclaration(DeclarationSpecifierList* declSpecList, Declarator* decl) : declSpecList(declSpecList), decl(decl) {}
 		virtual ~ParameterDeclaration();
 		string getName();
+		Type* getType(Scope* s);
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
 };
+
+/*template<>
+void NodeList<ParameterDeclaration> :: getNames(Scope* s, list<string>* ret) {
+	if (item != NULL) {ret->assign(1, item->getName());}
+	if (next != NULL) {next->getNames(s, ret);}
+}*/
+	   
 
 class ParameterList : public NodeList<ParameterDeclaration> {
 	public:
@@ -743,6 +801,11 @@ class ParameterList : public NodeList<ParameterDeclaration> {
 			if (next != NULL) {ret += ", " + next->getName();}
 			return ret;
 		}
+		void getNames(Scope* s, list<string>* ret) {
+			if (item != NULL) {ret->assign(1, item->getName());}
+			if (next != NULL) {next->getNames(s, ret);}
+		}
+
 };
 
 class ParameterTypeList : public Node {
@@ -759,6 +822,10 @@ class ParameterTypeList : public Node {
 			if (hasTrailing) {ret += ", ...";}
 			return ret;
 		}
+		TypeList* getTypes(Scope* s) {return paramList->getTypes(s);}
+		void getNames(Scope* s, list<string>* ret) {
+			paramList->getNames(s, ret);
+		}
 	private:
 		ParameterList* paramList = NULL;
 		bool hasTrailing = false; //If list ends with ', ...'
@@ -769,6 +836,7 @@ class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 		ParameterTypeListDirectDeclarator(ParameterTypeList* params) : params(params) {}
 		virtual ~ParameterTypeListDirectDeclarator();
 		string getName();
+		ParameterTypeList* getParams() {return params;}
 	private:
 		ParameterTypeList* params = NULL;
 };
@@ -976,11 +1044,75 @@ class FunctionDefinition : public Node {
 			if (declList != NULL) {delete declList;}
 			if (state != NULL) {delete state;}
 		}
+		virtual Type* getType(Scope* s) {
+			if (typeOfThis == NULL) {
+				return NULL;
+			} else {
+				return typeOfThis;
+			}
+		}
+		virtual bool typeCheck(Scope* s) {
+			//TODO: Improve this
+			bool ret = true;
+			DirectDeclarator* dirDecl = decl->getDirectDeclarator();
+			//Expect that dirDecl is an identifier direct declarator,
+			//i.e. the name of the function
+			IdentifierDirectDeclarator* idDirDecl = NULL;
+			if (!(idDirDecl = dynamic_cast<IdentifierDirectDeclarator*>\
+						(dirDecl))) {
+					string err = "Expected direct declarator with identifier type"\
+								  " in function definition";
+					throw new TypeError(err);
+			}
+			//Fetch name of function
+			string name = idDirDecl->getIdentifier()->getName();
+			//Add this function to the scope, unless it is already declared
+			//Create local scope for the function
+			Scope* functionScope = new Scope(s);
+			//Insert all parameters into the functionScope
+			//Do this by first getting the next DirectDeclarator from the first
+			//one and downcast to ParameterTypeListDirectDeclarator
+			ParameterTypeListDirectDeclarator* paramDirDecl = NULL;
+			if (!(paramDirDecl = dynamic_cast<ParameterTypeListDirectDeclarator*>\
+						(dirDecl->getNext()))) {
+				string err = "Expected parameter type list in function "\
+							  "declaration";
+				throw new TypeError(err);
+			}
+			//Then get all the types from the ParameterTypeList
+			ParameterTypeList* paramList = paramDirDecl->getParams();
+			TypeList* paramTypes = NULL;
+			//list<string>* paramNames = new list<string>();
+			if (paramList != NULL) {
+				paramTypes = paramList->getTypes(functionScope);
+				//paramList->getNames(functionScope, paramNames);
+				typeOfThis = new FunctionType(declSpecList->getType(s), paramTypes);
+			} else {
+				typeOfThis = new FunctionType(declSpecList->getType(s), \
+						new TypeList(new NoType()));
+			}
+			//Else, no parameters, which is OK
+			//And enter the special case 'return' as well
+			functionScope->insert("return", declSpecList->getType(s));
+			//Seriously not sure what to do with declList, this is my best guess
+			if (declList != NULL) {
+				ret = ret && declList->typeCheck(functionScope);
+			}
+			//Just type check the compound statement
+			ret = ret && state->typeCheck(functionScope);
+			if (ret == false) {
+				string err = "Error when type checking function definition of " +\
+							  name;
+				throw new TypeError(err);
+			}
+			return ret;
+		}
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
 		DeclarationList* declList = NULL; //Optional
 		CompoundStatement* state = NULL;
+		Type* typeOfThis = NULL; //Set when running typeCheck(s)
 };
 
 class TypeSpecifier : public DeclarationSpecifier {

@@ -1,5 +1,6 @@
 #include <string>
 #include <map>
+#include <list>
 using namespace std;
 
 enum PriorityEnum {DEFAULT, COMMA, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, \
@@ -8,6 +9,7 @@ enum PriorityEnum {DEFAULT, COMMA, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, \
 class Parser;
 class Type;
 class Scope;
+class TypeList;
 
 //! Abstract base class for all classes in the AST
 /*! A pure virtual function here forces all subclasses, i.e. all classes in
@@ -44,9 +46,11 @@ class NodeList : public Node {
 		}
 		void setNext(NodeList* n) {next = n;}
 		virtual Type* getType(Scope* s) {return item->getType(s);}	
+		virtual TypeList* getTypes(Scope* s);
 		virtual bool typeCheck(Scope* scope);
 		T* getItem() {return item;}
 		NodeList* getNext() {return next;}
+		void getNames(Scope* s, list<string>* ret);
 	protected:
 		bool typeCheck(Scope* s, Type* t);
 		T* item;
@@ -424,8 +428,13 @@ class TypeError : public runtime_error {
 
 template<class T>
 bool NodeList<T> :: typeCheck(Scope* s) {
-	if (next == NULL) {
+	if (next == NULL && item == NULL) {
 		return true;
+	} else if (next == NULL && item != NULL) {
+		return item->typeCheck(s);
+	} else if (next != NULL && item == NULL) {
+		//Should not happen very much
+		return next->typeCheck(s, item->getType(s));
 	} else {
 		return item->typeCheck(s) && next->typeCheck(s, item->getType(s));
 	}
@@ -434,10 +443,21 @@ bool NodeList<T> :: typeCheck(Scope* s) {
 template<class T>
 bool NodeList<T> :: typeCheck(Scope* s, Type* t) {
 	if (next == NULL) {
-		return *t == *item->getType(s);
+		return item->typeCheck(s) && *t == *item->getType(s);
 	} else {
 		return item->typeCheck(s) && *t == *item->getType(s) && next->typeCheck(s, t);
 	}
 }
 
+
+template<class T>
+TypeList* NodeList<T> :: getTypes(Scope* s) {
+	if (next != NULL && item != NULL) {
+		return new TypeList(item->getType(s), next->getTypes(s));
+	} else if (item != NULL) {
+		return new TypeList(item->getType(s));
+	} else {
+		return new TypeList(new NoType());
+	}
+}
 

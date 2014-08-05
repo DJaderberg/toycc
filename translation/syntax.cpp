@@ -19,6 +19,10 @@ string ParameterDeclaration :: getName() {
 	return ret;
 }
 
+Type* ParameterDeclaration :: getType(Scope* s) {
+	return declSpecList->getType(s);
+}
+
 ParameterTypeListDirectDeclarator :: ~ParameterTypeListDirectDeclarator() {
 	if (params != NULL) {delete params;}
 }
@@ -52,6 +56,18 @@ string BlockItem :: getName() {
 	if (state != NULL) {return state->getName();}
 	if (decl != NULL) {return decl->getName();}
 	return "";
+}
+
+bool BlockItem :: typeCheck(Scope* s) {
+	if (decl != NULL) {return decl->typeCheck(s);}
+	if (state != NULL) {return state->typeCheck(s);}
+	return false;
+}
+
+Type* BlockItem :: getType(Scope* s) {
+	if (decl != NULL) {return decl->getType(s);}
+	if (state != NULL) {return state->getType(s);}
+	return new NoType();
 }
 
 string Pointer :: getName() {
@@ -209,7 +225,7 @@ BlockItem* Parser :: parseBlockItem() {
 	}
 	if (state != NULL && decl != NULL) {
 		//Both matches, compare length
-		if (state->getName().length() > decl->getName().length()) {
+		if (stateUsed >= declUsed) {
 			source->setUsed(stateUsed);
 			ret = new BlockItem(state);
 		} else {
@@ -1200,6 +1216,17 @@ bool Declarator ::  insert(Scope* s, Type* t) {
 		ptrTmp = ptrTmp->getNext();
 	}
 	return dirDecl->insert(s, t);
+}
+
+Type* Constant :: getType(string str) {
+	string::size_type search = str.find('.');
+	if (search != string::npos) {
+		//double
+		return new BasicType(DOUBLE);
+	} else {
+		//int
+		return new BasicType(INT);
+	}
 }
 
 
