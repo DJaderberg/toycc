@@ -617,6 +617,7 @@ class Pointer : public Node {
 			typeQualList(typeQualList), next(NULL) {}
 		string getName();
 		virtual ~Pointer();
+		Pointer* getNext() {return next;}
 	private:
 		TypeQualifierList* typeQualList = NULL;
 		Pointer* next = NULL;
@@ -629,6 +630,9 @@ class Declarator : public Node {
 		Declarator(DirectDeclarator* dirDecl, Pointer* pointer) : dirDecl(dirDecl), pointer(pointer) {}
 		virtual ~Declarator(); 
 		string getName();
+		Pointer* getPointer() {return pointer;}
+		DirectDeclarator* getDirectDeclarator() {return dirDecl;}
+		bool insert(Scope* s, Type* t);
 	private:
 		DirectDeclarator* dirDecl = NULL;
 		Pointer* pointer = NULL;
@@ -666,6 +670,7 @@ class DirectDeclarator : public Node {
 			if (next != NULL) {ret = next->getName();}
 			return ret;
 		}
+		virtual bool insert(Scope* s, Type* t) {return false;}
 	protected:
 		DirectDeclarator* next = NULL;
 };
@@ -684,6 +689,14 @@ class IdentifierDirectDeclarator : public DirectDeclarator {
 		}
 		virtual ~IdentifierDirectDeclarator() {
 			if (id != NULL) {delete id;}
+		}
+		bool insert(Scope* s, Type* t) {
+			if (id != NULL) {
+				s->insert(id->getName(), t);
+				return true;
+			} else {
+				return false;
+			}
 		}
 	private:
 		Identifier* id = NULL;
@@ -812,6 +825,10 @@ class InitDeclarator : public Node {
 			if (init != NULL) {ret += " = " + init->getName();}
 			return ret;
 		}
+		bool insert(Scope* s, Type* type) {
+			//TODO: Initialize variable as well
+			return dec->insert(s, type);
+		}
 	private:
 		Declarator* dec;
 		Initializer* init;
@@ -908,11 +925,11 @@ class Declaration : public Node {
 					NodeList<InitDeclarator>* initListTemp = initList;
 					while ((initDecl = initListTemp->getItem()) != NULL && \
 							initListTemp->getNext() != NULL)  {
+						initDecl-> insert(s, type);
 						initListTemp = initListTemp->getNext();
-						s->insert(initDecl->getName(), type);
 					}
-					if ((initDecl = initList->getItem()) != NULL) {
-						s->insert(initDecl->getName(), type);
+					if ((initDecl = initListTemp->getItem()) != NULL) {
+						initDecl-> insert(s, type);
 					}
 					return true;
 				}

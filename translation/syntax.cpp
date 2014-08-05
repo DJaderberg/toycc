@@ -1193,3 +1193,13 @@ map<string, BasicTypeEnum> DeclarationSpecifierList :: initBasicTypesMap() {
 	return ret;
 }
 
+bool Declarator ::  insert(Scope* s, Type* t) {
+	Pointer* ptrTmp = pointer;
+	while (ptrTmp != NULL) {
+		t = new PointerType(t);
+		ptrTmp = ptrTmp->getNext();
+	}
+	return dirDecl->insert(s, t);
+}
+
+

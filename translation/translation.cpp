@@ -81,6 +81,8 @@ int translate(string filename) {
 			cout << typeOfA->getName() << '\n';
 			Type* typeOfB = scope->find("b");
 			cout << typeOfB->getName() << '\n';
+			Type* typeOfSum = scope->find("sum");
+			cout << typeOfSum->getName() << '\n';
 		}
 	}
 		

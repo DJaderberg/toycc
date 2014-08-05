@@ -1,5 +1,5 @@
-int a,b;
-int sum = a + b; //Comment
+int a,*b;
+double sum = a + *b; //Comment
 int mult = 0;
 void function(void) {
 mult *= a - b;
