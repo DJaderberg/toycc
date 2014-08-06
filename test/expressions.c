@@ -4,7 +4,7 @@
 int function(int a) {
 	int b, c;
 	b = 3;
-	c = a + b;
+	c = a + &b;
 	return c;
 }
 mult *= a - b;

@@ -20,6 +20,8 @@ int main(int argc, char *argv[]) {
 	} catch (runtime_error& error) {
 		cout << "Error: " << error.what() << "\n";
 		return 1;
+	} catch (TypeError* err) {
+		cout << "Type error: " << err->what() << '\n';
 	} catch (...) {
 		cout << "Unknown exception" << '\n';
 	}
@@ -77,12 +79,6 @@ int translate(string filename) {
 			cout << "Type check: " << ptr->typeCheck(scope) << '\n';
 			cout << ptr->getName() << '\n';
 			//cout << ptr->getType(scope)->getName() << '\n';
-			Type* typeOfA = scope->find("a");
-			cout << typeOfA->getName() << '\n';
-			Type* typeOfB = scope->find("b");
-			cout << typeOfB->getName() << '\n';
-			Type* typeOfSum = scope->find("sum");
-			cout << typeOfSum->getName() << '\n';
 		}
 	}
 		

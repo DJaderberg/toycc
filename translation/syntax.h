@@ -217,6 +217,7 @@ class SpecifierQualifierList;
 class StructDeclaratorList;
 class StructDeclarator;
 
+
 //Constructs an AST from the input Tokens
 class Parser {
 	public:
@@ -569,6 +570,21 @@ class JumpStatement : public Statement {
 			if (id != NULL) {delete id;}
 			if (expr != NULL) {delete expr;}
 		}
+		Type* getType(Scope* s) {
+			if (expr != NULL) {return expr->getType(s);}
+			return new NoType();
+		}
+		bool typeCheck(Scope* s) {
+			if (expr == NULL) {
+				return true;
+			}
+			if (keyword == "return") {
+				Type* search = s->find("return");
+				return *search == *expr->getType(s);
+			} else {
+				return true;
+			}
+		}
 	private:
 		string keyword;
 		Identifier* id = NULL;
@@ -778,17 +794,11 @@ class ParameterDeclaration : public Node {
 		virtual ~ParameterDeclaration();
 		string getName();
 		Type* getType(Scope* s);
+		Declarator* getDeclarator() {return decl;}
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
 };
-
-/*template<>
-void NodeList<ParameterDeclaration> :: getNames(Scope* s, list<string>* ret) {
-	if (item != NULL) {ret->assign(1, item->getName());}
-	if (next != NULL) {next->getNames(s, ret);}
-}*/
-	   
 
 class ParameterList : public NodeList<ParameterDeclaration> {
 	public:
@@ -802,10 +812,33 @@ class ParameterList : public NodeList<ParameterDeclaration> {
 			return ret;
 		}
 		void getNames(Scope* s, list<string>* ret) {
-			if (item != NULL) {ret->assign(1, item->getName());}
-			if (next != NULL) {next->getNames(s, ret);}
+			NodeList<ParameterDeclaration>* tempList = this;
+			ParameterDeclaration* tempItem = item;
+			while (tempItem != NULL) {
+				ret->push_back(item->getDeclarator()->getName());
+				tempList = tempList->getNext();
+				if (tempList != NULL) {
+					tempItem = tempList->getItem();
+				} else {
+						tempItem = NULL;
+					}
+			}
 		}
-
+		//Inserts each element into the scope s with the correct type
+		/* Expects that typeList and nameList contain the same number of 
+		 * elements.
+		 */
+		static bool enterTypes(Scope* s, TypeList* typeList, list<string>* nameList) {
+			if (typeList == NULL && nameList->empty()) {
+				return true;
+			} else if (typeList == NULL || nameList->empty()) {
+				return false;
+			} else {
+				bool temp = s->insert(nameList->front(), typeList->getItem());
+				nameList->pop_front();
+				return temp && enterTypes(s, typeList->getNext(), nameList);
+			}
+		}
 };
 
 class ParameterTypeList : public Node {
@@ -1046,7 +1079,7 @@ class FunctionDefinition : public Node {
 		}
 		virtual Type* getType(Scope* s) {
 			if (typeOfThis == NULL) {
-				return NULL;
+				return NULL; //TODO: Set the type, then
 			} else {
 				return typeOfThis;
 			}
@@ -1082,11 +1115,13 @@ class FunctionDefinition : public Node {
 			//Then get all the types from the ParameterTypeList
 			ParameterTypeList* paramList = paramDirDecl->getParams();
 			TypeList* paramTypes = NULL;
-			//list<string>* paramNames = new list<string>();
+			list<string>* paramNames = new list<string>();
 			if (paramList != NULL) {
 				paramTypes = paramList->getTypes(functionScope);
-				//paramList->getNames(functionScope, paramNames);
+				paramList->getNames(functionScope, paramNames);
 				typeOfThis = new FunctionType(declSpecList->getType(s), paramTypes);
+				ParameterList::enterTypes(functionScope, paramTypes, \
+						paramNames);
 			} else {
 				typeOfThis = new FunctionType(declSpecList->getType(s), \
 						new TypeList(new NoType()));
@@ -1101,8 +1136,8 @@ class FunctionDefinition : public Node {
 			//Just type check the compound statement
 			ret = ret && state->typeCheck(functionScope);
 			if (ret == false) {
-				string err = "Error when type checking function definition of " +\
-							  name;
+				string err = "Error when type checking function definition of '" +\
+							  name + "'";
 				throw new TypeError(err);
 			}
 			return ret;

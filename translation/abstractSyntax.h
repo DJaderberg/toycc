@@ -99,6 +99,7 @@ class Type {
 		bool operator !=(const Type& other) const {
 			return !(*this == other);
 		}
+		virtual ~Type() {}
 	private:
 		TypeKindEnum kind;
 		unsigned int size = 0; //In bytes
@@ -195,6 +196,7 @@ class PointerType : public Type {
 			return ret;
 		}
 		Type* getPointeeType() {return pointeeType;}
+		virtual ~PointerType() {if (pointeeType != NULL) {delete pointeeType;}}
 	private:
 		Type* pointeeType = NULL;
 };
@@ -230,6 +232,10 @@ class TypeList {
 			if (item != NULL) {ret += item->getName();}
 			if (next != NULL) {ret += " " + next->getName();}
 			return ret;
+		}
+		virtual ~TypeList() {
+			if (item != NULL) {delete item;}
+			if (next != NULL) {delete next;}
 		}
 	protected:
 		unsigned int getStructSize(unsigned int current) {
@@ -288,6 +294,10 @@ class FunctionType : public Type {
 		}
 		Type* getReturnType() const {return this->returnType;}
 		TypeList* getParams() const {return this->params;}
+		virtual ~FunctionType() {
+			if (returnType != NULL) {delete returnType;}
+			if (params != NULL) {delete params;}
+		}
 	private:
 		Type* returnType = NULL;
 		TypeList* params = NULL;
@@ -312,6 +322,9 @@ class StructType : public Type {
 			ret += "}";
 			return ret;
 		}
+		virtual ~StructType() {
+			if (members != NULL) {delete members;}
+		}
 	private:
 		TypeList* members = NULL;
 };
@@ -335,6 +348,9 @@ class UnionType : public Type {
 			ret += "}";
 			return ret;
 		}
+		virtual ~UnionType() {
+			if (members != NULL) {delete members;}
+		}
 	private:
 		TypeList* members = NULL;
 };
@@ -344,8 +360,11 @@ class Symbol {
 	public:
 		Symbol(Type* type) : type(type) {}
 		Type* getType() {return type;}
+		~Symbol() {
+			if (type != NULL) {delete type;}
+		}
 	private:
-		Type* type;
+		Type* type = NULL;
 };
 
 class SymbolTable {
@@ -413,6 +432,9 @@ class Scope {
 		}
 		bool remove(string str) {
 			return table->remove(str);
+		}
+		virtual ~Scope() {
+			if (table != NULL) {delete table;}
 		}
 	private:
 		SymbolTable* table = NULL;
