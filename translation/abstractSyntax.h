@@ -45,7 +45,7 @@ class Node {
 			o->put(";No known assembly code for " + this->getName() + "\n");
 		}
 		virtual string getLLVMName() const {
-			return ";Unkown LLVM IR";
+			return ";Deprecated";
 		}
 		virtual ~Node() {}
 };

@@ -112,6 +112,9 @@ class BinaryOperator : public InfixOperator {
 		virtual Type* getType(Scope* s) {
 			return lhs->getType(s);
 		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			o->put("op" + this->opStr + " ");
+		}
 		void parse(Parser* parser);
 	protected:
 		Op* rhs = NULL; //The right hand side 
@@ -448,7 +451,7 @@ class BlockItem : public Node {
 		string getName();
 		bool typeCheck(Scope* s); 
 		Type* getType(Scope* s);
-		string getLLVMName() const;
+		void genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		Declaration* decl = NULL;
 		Statement* state = NULL;
@@ -463,6 +466,13 @@ class BlockItemList : public NodeList<BlockItem> {
 			if (item != NULL) {ret += item->getName();}
 			if (next != NULL) {ret += "\n" + next->getName();}
 			return ret;
+		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			if (item != NULL) {item->genLLVM(s, o);}
+			if (next != NULL) {
+				o->put("\n");
+				next->genLLVM(s, o);
+			}
 		}
 };
 
@@ -494,8 +504,8 @@ class CompoundStatement : public Statement {
 			delete localScope;
 			return ret;
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) const {
-			o->put(this->getLLVMName());
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			itemList->genLLVM(s, o);
 		}
 		string getLLVMName() const {
 			string ret = "{\n";
@@ -523,6 +533,9 @@ class ExpressionStatement : public Statement {
 		}
 		virtual bool typeCheck(Scope* s) {
 			return expression->typeCheck(s);
+		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			expression->genLLVM(s, o);
 		}
 	private:
 		Expression* expression = NULL; //Optional
@@ -806,7 +819,7 @@ class ParameterDeclaration : public Node {
 		string getName();
 		Type* getType(Scope* s);
 		Declarator* getDeclarator() {return decl;}
-		string getLLVMName() const;
+		void genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
@@ -872,11 +885,9 @@ class ParameterTypeList : public Node {
 			if (hasTrailing) {ret += ", ...";}
 			return ret;
 		}
-		string getLLVMName() const {
-			string ret = "";
-			if (paramList != NULL) {ret += paramList->getLLVMName();}
-			if (hasTrailing) {ret += ", ...";}
-			return ret;
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			if (paramList != NULL) {paramList->genLLVM(s, o);}
+			if (hasTrailing) {o->put(", ...");}
 		}
 		TypeList* getTypes(Scope* s) {return paramList->getTypes(s);}
 		void getNames(Scope* s, list<string>* ret) {
@@ -893,9 +904,8 @@ class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 		virtual ~ParameterTypeListDirectDeclarator();
 		string getName();
 		ParameterTypeList* getParams() {return params;}
-		string getLLVMName() const {
-			if (params != NULL) {return params->getLLVMName();}
-			return "";
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			if (params != NULL) {params->genLLVM(s, o);}
 		}
 	private:
 		ParameterTypeList* params = NULL;
@@ -1214,7 +1224,7 @@ class FunctionDefinition : public Node {
 				string err = "Expected parameter list in function declaration";
 				throw new TypeError(err);
 			}
-			o->put(paramDirDecl->getLLVMName());
+			paramDirDecl->genLLVM(s, o);
 			o->put(") ");
 			state->genLLVM(s, o);
 		}

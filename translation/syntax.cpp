@@ -24,18 +24,14 @@ string ParameterDeclaration :: getName() {
 	return ret;
 }
 
-string ParameterDeclaration :: getLLVMName() const {
-	string ret = "";
+void ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 	if (declSpecList != NULL) {
-		Scope* fakeScope = new Scope();
 		//Should never need scope in getting type
-		Type* declSpecType = declSpecList->getType(fakeScope);
-		ret += declSpecType->getLLVMName();
+		Type* declSpecType = declSpecList->getType(s);
+		o->put(declSpecType->getLLVMName());
 		delete declSpecType;
-		delete fakeScope;
 	}
-	if (decl != NULL) {ret += " %" + decl->getName();}
-	return ret;
+	if (decl != NULL) {o->put(" %" + decl->getName());}
 }
 
 Type* ParameterDeclaration :: getType(Scope* s) {
@@ -89,10 +85,9 @@ Type* BlockItem :: getType(Scope* s) {
 	return new NoType();
 }
 
-string BlockItem :: getLLVMName() const {
-	if (decl != NULL) {return decl->getLLVMName();}
-	if (state != NULL) {return state->getLLVMName();}
-	return "";
+void BlockItem :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (decl != NULL) {decl->genLLVM(s, o);}
+	if (state != NULL) {state->genLLVM(s, o);}
 }
 
 string Pointer :: getName() {
