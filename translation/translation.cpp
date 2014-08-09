@@ -8,7 +8,8 @@ int main(int argc, char *argv[]) {
 	} else {
 		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
 		filename = "/Users/David/toycc/test/expressions.c"; //Parsing
-		//filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
+		filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
+		filename = "/Users/David/toycc/test/ir.c"; //Code generation
 	}
 	try {
 	return translate(filename);
@@ -76,8 +77,12 @@ int translate(string filename) {
 			return 0;
 		} else {
 			Scope* scope = new Scope();
-			cout << "Type check: " << ptr->typeCheck(scope) << '\n';
+			//cout << "Type check: " << ptr->typeCheck(scope) << '\n';
 			cout << ptr->getName() << '\n';
+			string ofilename = "/Users/David/toycc/test/ir.ll";
+			ofstream filestream = ofstream(ofilename);
+			Consumer<string>* llvmOutput = new StreamConsumer(filestream);
+			ptr->genLLVM(scope, llvmOutput);
 			//cout << ptr->getType(scope)->getName() << '\n';
 		}
 	}

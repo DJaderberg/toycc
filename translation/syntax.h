@@ -1,4 +1,4 @@
-#include "source.h"
+//#include "source.h"
 #include "abstractSyntax.h"
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
@@ -295,7 +295,7 @@ class Identifier : public Node {
 		virtual ~Identifier() {}
 		bool typeCheck(Scope* s) {return true;}
 		Type* getType(Scope* s) {
-			Type* search = s->find(this->getName());
+			Type* search = s->find(this->getName())->getType();
 			if (search == NULL) {
 				return new NoType();
 			} 
@@ -421,6 +421,7 @@ class ExternalDeclaration : public Node {
 		ExternalDeclaration(Declaration* decl) : decl(decl) {}
 		string getName();
 		bool typeCheck(Scope* s);
+		void genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		FunctionDefinition* funcDef = NULL;
 		Declaration* decl = NULL;
@@ -447,6 +448,7 @@ class BlockItem : public Node {
 		string getName();
 		bool typeCheck(Scope* s); 
 		Type* getType(Scope* s);
+		string getLLVMName() const;
 	private:
 		Declaration* decl = NULL;
 		Statement* state = NULL;
@@ -490,6 +492,15 @@ class CompoundStatement : public Statement {
 			Scope* localScope = new Scope(s);
 			bool ret = itemList->typeCheck(localScope);
 			delete localScope;
+			return ret;
+		}
+		void genLLVM(Scope* s, Consumer<string>* o) const {
+			o->put(this->getLLVMName());
+		}
+		string getLLVMName() const {
+			string ret = "{\n";
+			if (itemList != NULL) {ret += itemList->getLLVMName();}
+			ret += "}\n";
 			return ret;
 		}
 	private:
@@ -579,7 +590,7 @@ class JumpStatement : public Statement {
 				return true;
 			}
 			if (keyword == "return") {
-				Type* search = s->find("return");
+				Type* search = s->find("return")->getType();
 				return *search == *expr->getType(s);
 			} else {
 				return true;
@@ -795,6 +806,7 @@ class ParameterDeclaration : public Node {
 		string getName();
 		Type* getType(Scope* s);
 		Declarator* getDeclarator() {return decl;}
+		string getLLVMName() const;
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
@@ -815,7 +827,12 @@ class ParameterList : public NodeList<ParameterDeclaration> {
 			NodeList<ParameterDeclaration>* tempList = this;
 			ParameterDeclaration* tempItem = item;
 			while (tempItem != NULL) {
-				ret->push_back(item->getDeclarator()->getName());
+				Declarator* itemDecl = item->getDeclarator();
+				if (itemDecl != NULL) {
+					ret->push_back(item->getDeclarator()->getName());
+				} else {
+					//TODO: Check that the type is void
+				}
 				tempList = tempList->getNext();
 				if (tempList != NULL) {
 					tempItem = tempList->getItem();
@@ -855,6 +872,12 @@ class ParameterTypeList : public Node {
 			if (hasTrailing) {ret += ", ...";}
 			return ret;
 		}
+		string getLLVMName() const {
+			string ret = "";
+			if (paramList != NULL) {ret += paramList->getLLVMName();}
+			if (hasTrailing) {ret += ", ...";}
+			return ret;
+		}
 		TypeList* getTypes(Scope* s) {return paramList->getTypes(s);}
 		void getNames(Scope* s, list<string>* ret) {
 			paramList->getNames(s, ret);
@@ -870,6 +893,10 @@ class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 		virtual ~ParameterTypeListDirectDeclarator();
 		string getName();
 		ParameterTypeList* getParams() {return params;}
+		string getLLVMName() const {
+			if (params != NULL) {return params->getLLVMName();}
+			return "";
+		}
 	private:
 		ParameterTypeList* params = NULL;
 };
@@ -1079,10 +1106,28 @@ class FunctionDefinition : public Node {
 		}
 		virtual Type* getType(Scope* s) {
 			if (typeOfThis == NULL) {
-				return NULL; //TODO: Set the type, then
+				ParameterTypeListDirectDeclarator* paramDirDecl = NULL;
+				if (!(paramDirDecl = dynamic_cast<ParameterTypeListDirectDeclarator*>\
+							(decl->getDirectDeclarator()->getNext()))) {
+					string err = "Expected parameter type list in function "\
+								  "declaration";
+					throw new TypeError(err);
+				}
+				ParameterTypeList* paramList = paramDirDecl->getParams();
+				TypeList* paramTypes = NULL;
+				list<string>* paramNames = new list<string>();
+				if (paramList != NULL) {
+					paramTypes = paramList->getTypes(s);
+					paramList->getNames(s, paramNames);
+					typeOfThis = new FunctionType(declSpecList->getType(s), paramTypes);
+					ParameterList::enterTypes(s, paramTypes, \
+							paramNames);
+				}
 			} else {
-				return typeOfThis;
+				typeOfThis = new FunctionType(declSpecList->getType(s), \
+						new TypeList(new NoType()));
 			}
+			return typeOfThis;
 		}
 		virtual bool typeCheck(Scope* s) {
 			//TODO: Improve this
@@ -1142,12 +1187,43 @@ class FunctionDefinition : public Node {
 			}
 			return ret;
 		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			o->put("\n;Function Attrs: ");
+			//TODO: Implement function attributes, if necessary
+			o->put("\ndefine ");
+			FunctionType* type = dynamic_cast<FunctionType*>(this->getType(s));
+			Type* returnType = type->getReturnType();
+			if (returnType != NULL) {
+				o->put(returnType->getLLVMName() + " @");
+			} else {
+				o->put("void @");
+			}
+			//Enter parameters, with types and %names
+			IdentifierDirectDeclarator* dirDecl \
+				= dynamic_cast<IdentifierDirectDeclarator*>\
+				(decl->getDirectDeclarator());
+			if (dirDecl == NULL) {
+				string err = "Expected identifier as function name";
+				throw new TypeError(err);
+			}
+			o->put(dirDecl->getIdentifier()->getName() + " (");
+			ParameterTypeListDirectDeclarator* paramDirDecl \
+				= dynamic_cast<ParameterTypeListDirectDeclarator*>\
+				(dirDecl->getNext());
+			if (paramDirDecl == NULL) {
+				string err = "Expected parameter list in function declaration";
+				throw new TypeError(err);
+			}
+			o->put(paramDirDecl->getLLVMName());
+			o->put(") ");
+			state->genLLVM(s, o);
+		}
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
 		DeclarationList* declList = NULL; //Optional
 		CompoundStatement* state = NULL;
-		Type* typeOfThis = NULL; //Set when running typeCheck(s)
+		FunctionType* typeOfThis = NULL; //Set when running typeCheck(s)
 };
 
 class TypeSpecifier : public DeclarationSpecifier {

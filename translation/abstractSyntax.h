@@ -1,7 +1,27 @@
 #include <string>
 #include <map>
 #include <list>
+#include <ostream>
+#include "source.h"
 using namespace std;
+
+template<class T>
+class Consumer {
+	public:
+		virtual void put(T item) = 0;
+		virtual ~Consumer() {}
+};
+
+class StreamConsumer : public Consumer<string> {
+	public:
+		StreamConsumer(basic_ostream<char>& filestream) : filestream(filestream) {}
+		void put(string item) {
+			filestream << item;
+		}
+	private:
+		basic_ostream<char>& filestream;
+};
+
 
 enum PriorityEnum {DEFAULT, COMMA, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, \
 	LOGICAL_AND, BITWISE_OR, BITWISE_XOR, BITWISE_AND, EQUALITY, RELATIONAL, \
@@ -21,6 +41,12 @@ class Node {
 		virtual string getName() = 0; //Returns string representation of object
 		virtual Type* getType(Scope* s);
 		virtual bool typeCheck(Scope* s);
+		virtual void genLLVM(Scope* s, Consumer<string>* o) {
+			o->put(";No known assembly code for " + this->getName() + "\n");
+		}
+		virtual string getLLVMName() const {
+			return ";Unkown LLVM IR";
+		}
 		virtual ~Node() {}
 };
 
@@ -48,9 +74,11 @@ class NodeList : public Node {
 		virtual Type* getType(Scope* s) {return item->getType(s);}	
 		virtual TypeList* getTypes(Scope* s);
 		virtual bool typeCheck(Scope* scope);
+		virtual void genLLVM(Scope* s, Consumer<string>* output);
 		T* getItem() {return item;}
 		NodeList* getNext() {return next;}
 		void getNames(Scope* s, list<string>* ret);
+		string getLLVMName() const;
 	protected:
 		bool typeCheck(Scope* s, Type* t);
 		T* item;
@@ -92,6 +120,7 @@ class Type {
 		virtual unsigned int getSize() {return this->size;}
 		TypeKindEnum getKind() const {return this->kind;}
 		virtual string getName() const = 0;
+		virtual string getLLVMName() const = 0;
 		virtual bool operator ==(const Type& other) const {
 			return this->equals(other);
 		}
@@ -114,6 +143,9 @@ class NoType: public Type {
 		}
 		string getName() const {
 			return "NO TYPE";
+		}
+		string getLLVMName() const {
+			return "void";
 		}
 };
 
@@ -151,7 +183,7 @@ class BasicType : public Type {
 				case UNSIGNED_LONG_LONG_INT : return 8;
 				case FLOAT : return 4;
 				case DOUBLE : return 8;
-				case LONG_DOUBLE : return 8;
+				case LONG_DOUBLE : return 16;
 			}
 		}
 		string getName() const {
@@ -173,7 +205,26 @@ class BasicType : public Type {
 				case LONG_DOUBLE : return "long double";
 			}
 		}
+		string getLLVMName() const {
+			switch(basicType) {
+				case _BOOL : return "i8";
+				case CHAR : return "i8";
+				case SIGNED_CHAR : return "i8";
+				case UNSIGNED_CHAR : return "i8";
+				case SHORT_INT : return "i32";
+				case UNSIGNED_SHORT_INT : return "i32";
+				case INT : return "i64";
+				case UNSIGNED_INT : return "i64";
+				case LONG_INT : return "i64";
+				case UNSIGNED_LONG_INT : return "i64";
+				case LONG_LONG_INT : return "i64";
+				case UNSIGNED_LONG_LONG_INT : return "i64";
+				case FLOAT : return "float";
+				case DOUBLE : return "double";
+				case LONG_DOUBLE : return "fp128";
 
+			}
+		}
 	private:
 		BasicTypeEnum basicType;
 };
@@ -197,6 +248,13 @@ class PointerType : public Type {
 		}
 		Type* getPointeeType() {return pointeeType;}
 		virtual ~PointerType() {if (pointeeType != NULL) {delete pointeeType;}}
+		string getLLVMName() const {
+			if (pointeeType != NULL) {
+				return pointeeType->getLLVMName() + " *";
+			} else {
+				return "i8 *"; //Pointer to void not allowed, this used instead
+			}
+		}
 	private:
 		Type* pointeeType = NULL;
 };
@@ -233,6 +291,12 @@ class TypeList {
 			if (next != NULL) {ret += " " + next->getName();}
 			return ret;
 		}
+		string getLLVMName() const {
+			string ret = "";
+			if (item != NULL) {ret += item->getLLVMName();}
+			if (next != NULL) {ret += next->getLLVMName();}
+			return ret;
+		}
 		virtual ~TypeList() {
 			if (item != NULL) {delete item;}
 			if (next != NULL) {delete next;}
@@ -266,7 +330,6 @@ class TypeList {
 		TypeList* next = NULL;
 };
 
-
 class FunctionType : public Type {
 	public:
 		FunctionType(Type* returnType, TypeList* params) : Type(FUNCTION, 8), \
@@ -298,6 +361,20 @@ class FunctionType : public Type {
 			if (returnType != NULL) {delete returnType;}
 			if (params != NULL) {delete params;}
 		}
+		string getLLVMName() const {
+			string ret = "";
+			if (returnType != NULL) {
+				ret += returnType->getLLVMName();
+			} else {
+				ret += "void";
+			}
+			ret += " (";
+			if (params != NULL) {
+				ret += params->getLLVMName();
+			}
+			ret += ")";
+			return ret;
+		}
 	private:
 		Type* returnType = NULL;
 		TypeList* params = NULL;
@@ -319,6 +396,12 @@ class StructType : public Type {
 		string getName() const {
 			string ret = "struct {";
 			if (members != NULL) {ret += members->getName();}
+			ret += "}";
+			return ret;
+		}
+		string getLLVMName() const {
+			string ret = "{";
+			if (members != NULL) {ret += members->getLLVMName();}
 			ret += "}";
 			return ret;
 		}
@@ -348,6 +431,13 @@ class UnionType : public Type {
 			ret += "}";
 			return ret;
 		}
+		string getLLVMName() const {
+			//TODO: Implement as union, not struct
+			string ret = "{";
+			if (members != NULL) {ret += members->getLLVMName();}
+			ret += "}";
+			return ret;
+		}
 		virtual ~UnionType() {
 			if (members != NULL) {delete members;}
 		}
@@ -370,7 +460,7 @@ class Symbol {
 class SymbolTable {
 	public:
 		SymbolTable() {}
-		Type* find(const string input) {
+		Symbol* find(const string input) {
 			auto search = mVarType.find(input);
 			if (search != mVarType.end()) {
 				return search->second;
@@ -382,7 +472,7 @@ class SymbolTable {
 			if (this->find(key) != NULL) {
 				return false; //Already in the list, can't insert
 			} else {
-				mVarType[key] = val;
+				mVarType[key] = new Symbol(val);
 				return true;
 			}
 		}
@@ -395,7 +485,7 @@ class SymbolTable {
 			}
 		}
 	private:
-		map<string, Type*> mVarType;
+		map<string, Symbol*> mVarType;
 };
 
 class Scope {
@@ -403,13 +493,13 @@ class Scope {
 		Scope() : table(new SymbolTable()), enclosing(NULL) {}
 		Scope(Scope* enclosing) : table(new SymbolTable()), \
 								  enclosing(enclosing) {}
-		Type* find(string key) {
-			Type* ret = NULL;
+		Symbol* find(string key) {
+			Symbol* ret = NULL;
 			if (table != NULL) {
-				Type* localSearch = table->find(key);
+				Symbol* localSearch = table->find(key);
 				if (localSearch == NULL) {
 					if (enclosing != NULL) {
-						Type* globalSearch = enclosing->find(key);
+						Symbol* globalSearch = enclosing->find(key);
 						if (globalSearch != NULL) {
 							ret = globalSearch;
 						}
@@ -419,7 +509,7 @@ class Scope {
 				}
 			} else {
 				if (enclosing != NULL) {
-					Type* globalSearch = enclosing->find(key);
+					Symbol* globalSearch = enclosing->find(key);
 					if (globalSearch != NULL) {
 						ret = globalSearch;
 					}
@@ -471,6 +561,24 @@ bool NodeList<T> :: typeCheck(Scope* s, Type* t) {
 	}
 }
 
+template<class T>
+void NodeList<T> :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (item != NULL) {
+		item->genLLVM(s, o);
+	}
+	if (next != NULL) {
+		o->put("\n");
+		next->genLLVM(s, o);
+	}
+}
+
+template<class T>
+string NodeList<T> :: getLLVMName() const {
+	string ret = "";
+	if (item != NULL) {ret += item->getLLVMName();}
+	if (next != NULL) {ret += ", " + next->getLLVMName();}
+	return ret;
+}
 
 template<class T>
 TypeList* NodeList<T> :: getTypes(Scope* s) {

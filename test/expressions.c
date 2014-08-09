@@ -1,10 +1,10 @@
-//int a, **b;
-//double sum = a + *b; //Comment
-//int mult = 0;
+int a, **b;
+double sum = a + *b; //Comment
+int mult = 0;
 int function(int a) {
 	int b, c;
 	b = 3;
-	c = a + &b;
+	c = a + b;
 	return c;
 }
 mult *= a - b;

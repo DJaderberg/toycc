@@ -7,6 +7,11 @@ string ExternalDeclaration :: getName() {
 	return ret;
 }
 
+void ExternalDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (funcDef != NULL) {funcDef->genLLVM(s, o);}
+	if (decl != NULL) {decl->genLLVM(s, o);}
+}
+
 ParameterDeclaration :: ~ParameterDeclaration() {
 	if (declSpecList != NULL) {delete declSpecList;}
 	if (decl != NULL) {delete decl;}
@@ -16,6 +21,20 @@ string ParameterDeclaration :: getName() {
 	string ret = "";
 	if (declSpecList != NULL) {ret += declSpecList->getName();}
 	if (decl != NULL) {ret += decl->getName();}
+	return ret;
+}
+
+string ParameterDeclaration :: getLLVMName() const {
+	string ret = "";
+	if (declSpecList != NULL) {
+		Scope* fakeScope = new Scope();
+		//Should never need scope in getting type
+		Type* declSpecType = declSpecList->getType(fakeScope);
+		ret += declSpecType->getLLVMName();
+		delete declSpecType;
+		delete fakeScope;
+	}
+	if (decl != NULL) {ret += " %" + decl->getName();}
 	return ret;
 }
 
@@ -68,6 +87,12 @@ Type* BlockItem :: getType(Scope* s) {
 	if (decl != NULL) {return decl->getType(s);}
 	if (state != NULL) {return state->getType(s);}
 	return new NoType();
+}
+
+string BlockItem :: getLLVMName() const {
+	if (decl != NULL) {return decl->getLLVMName();}
+	if (state != NULL) {return state->getLLVMName();}
+	return "";
 }
 
 string Pointer :: getName() {
@@ -1188,6 +1213,8 @@ Type* DeclarationSpecifierList :: getType(Scope* s) {
 	auto search = mBasicTypes.find(basicTypeName);
 	if (search != mBasicTypes.end()) {
 		ret = new BasicType(search->second);
+	} else if (basicTypeName == "void") {
+		ret = new NoType();
 	}
 	return ret;
 }
