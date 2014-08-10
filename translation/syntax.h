@@ -39,6 +39,9 @@ class InfixOperator : public Operator {
 	public:
 		InfixOperator(Parser* parser, const string* opStr, PriorityEnum prio) \
 			: Operator(parser, opStr, prio) {}
+		InfixOperator(Parser* parser, const string* opStr, PriorityEnum prio, \
+				string LLVMOpStr) \
+			: Operator(parser, opStr, prio, LLVMOpStr) {}
 		virtual ~InfixOperator() {}
 };
 
@@ -67,6 +70,8 @@ class BinaryOperator : public InfixOperator {
 									 lhs(lhs) {}*/
 		BinaryOperator(Parser* parser, Op* lhs) : \
 			InfixOperator(parser, opStrTemp, prioTemp), lhs(lhs) {}
+		BinaryOperator(Parser* parser, Op* lhs, string LLVMOpStr) : \
+			InfixOperator(parser, opStrTemp, prioTemp, LLVMOpStr), lhs(lhs) {}
 		virtual ~BinaryOperator() {
 			if (rhs != NULL) {delete rhs;}
 			if (lhs != NULL) {delete lhs;}
@@ -112,9 +117,10 @@ class BinaryOperator : public InfixOperator {
 		virtual Type* getType(Scope* s) {
 			return lhs->getType(s);
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
-			o->put("op" + this->opStr + " ");
+		virtual void genLLVM(Scope* s, Consumer<string>* o) {
+			o->put("dunno binary op");
 		}
+		virtual void genLLVM(Scope* s, Consumer<string>* o, string result);
 		void parse(Parser* parser);
 	protected:
 		Op* rhs = NULL; //The right hand side 
@@ -298,7 +304,11 @@ class Identifier : public Node {
 		virtual ~Identifier() {}
 		bool typeCheck(Scope* s) {return true;}
 		Type* getType(Scope* s) {
-			Type* search = s->find(this->getName())->getType();
+			auto tempSearch = s->find(this->getName());
+			Type* search = NULL;
+			if (tempSearch != NULL) {
+				search = tempSearch->getType();
+			}
 			if (search == NULL) {
 				return new NoType();
 			} 
@@ -334,6 +344,10 @@ class Constant : public Identifier {
 		Type* getType(Scope* s) {return this->getType(token.getName());}
 		static Type* getType(string str); //ints and doubles only
 		bool typeCheck(Scope* s) {return true;}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			//TODO: Fix for weird constants
+			o->put(this->getName());
+		}
 };
 
 class EnumerationConstant : public Constant {
@@ -393,6 +407,11 @@ class ConstantExpression : public Expression {
 		void parse(Parser* parser) {}
 		Type* getType(Scope* s) {return constant->getType(s);}
 		bool typeCheck(Scope* s) {return constant->typeCheck(s);}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			if (constant != NULL) {
+				constant->genLLVM(s, o);
+			}
+		}
 	private:
 		Constant* constant = NULL;
 };
@@ -505,7 +524,9 @@ class CompoundStatement : public Statement {
 			return ret;
 		}
 		void genLLVM(Scope* s, Consumer<string>* o) {
+			o->put("{\n");
 			itemList->genLLVM(s, o);
+			o->put("}\n");
 		}
 		string getLLVMName() const {
 			string ret = "{\n";
@@ -535,7 +556,9 @@ class ExpressionStatement : public Statement {
 			return expression->typeCheck(s);
 		}
 		void genLLVM(Scope* s, Consumer<string>* o) {
-			expression->genLLVM(s, o);
+			if (expression != NULL) {
+				expression->genLLVM(s, o);
+			}
 		}
 	private:
 		Expression* expression = NULL; //Optional
@@ -609,6 +632,21 @@ class JumpStatement : public Statement {
 				return true;
 			}
 		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			//TODO: Implement all keywords
+			if (keyword == "return") {
+				if (expr != NULL) {
+					Type* exprType = expr->getType(s);
+					if (exprType->getLLVMName() != "void") {
+						string retOp = "%" + to_string(s->getTemp());
+						expr->genLLVM(s, o, retOp);
+						o->put("ret " + exprType->getLLVMName() + " " + retOp + \
+								"\n");
+					}
+				}
+			}
+		}
+
 	private:
 		string keyword;
 		Identifier* id = NULL;
@@ -1555,6 +1593,18 @@ class StandardAssignment : public Assignment<&StandardAssignmentOpStr> {
 			: Assignment(parser, lhs) {}
 		static StandardAssignment* create(Parser* parser, Expression* lhs)\
 	   	{return new StandardAssignment(parser, lhs);}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			//Assume that the name of rhs is an identifier and store the
+			//result of rhs there
+			if (IdentifierExpression* idDowncast = dynamic_cast<IdentifierExpression*>(rhs)) {
+				o->put("%" + lhs->getName() + " = %" + idDowncast->getName());
+			} else if (ConstantExpression* constDowncast = \
+						dynamic_cast<ConstantExpression*>(rhs)) {
+				o->put("%" + lhs->getName() + " = " + constDowncast->getName());
+			} else {
+				rhs->genLLVM(s, o, "%" + lhs->getName());
+			}
+		}
 };
 
 const string MultiplicationAssignmentOpStr = "*=";
@@ -1778,7 +1828,7 @@ const string AdditionOpStr = "+";
 class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 	public:
 		Addition(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs) {}
+			: BinaryOperator(parser, lhs, "add") {}
 		static Addition* create(Parser* parser, Expression* lhs) \
 		{return new Addition(parser, lhs);}
 };
@@ -1787,7 +1837,7 @@ const string SubtractionOpStr = "-";
 class Subtraction : public BinaryOperator<Expression, &SubtractionOpStr, ADDITIVE> {
 	public:
 		Subtraction(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs) {}
+			: BinaryOperator(parser, lhs, "sub") {}
 		static Subtraction* create(Parser* parser, Expression* lhs) \
 		{return new Subtraction(parser, lhs);}
 };
@@ -1796,7 +1846,7 @@ const string MultiplicationOpStr = "*";
 class Multiplication : public BinaryOperator<Expression, &MultiplicationOpStr, MULTIPLICATIVE> {
 	public:
 		Multiplication(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs) {}
+			: BinaryOperator(parser, lhs, "mul") {}
 		static Multiplication* create(Parser* parser, Expression* lhs) \
 		{return new Multiplication(parser, lhs);}
 };
@@ -2133,6 +2183,27 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 				return ret;
 			}
 		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			//We should not care about any return values
+			o->put("call ");
+			Symbol* symbol = s->find(lhs->getName());
+			if (symbol != NULL) {
+				Type* symbolType = symbol->getType();
+				if (symbolType != NULL) {
+					o->put(symbolType->getLLVMName());
+				} else {
+					o->put("void");
+				}
+				o->put(" " + lhs->getName() + "(");
+			} else {
+				string err = "Unknown return type of function";
+				throw new TypeError(err);
+			}
+		}
+		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
+			o->put(retOp + " = ");
+			this->genLLVM(s, o);
+		}
 };
 
 class GenericAssociation : public Expression {
@@ -2239,9 +2310,42 @@ void PostfixOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
 }
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
-void BinaryOperator<Op, opStrTemp, prioTemp>::parse(Parser* parser) {
+void BinaryOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
 	rhs = parser->parseExpression(prioTemp);
 }
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+void BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<string>* o, string result) {
+	string op1 = "%";
+	string op2 = "%";
+	IdentifierExpression* downcast = NULL;
+	ConstantExpression* downcastConst = NULL;
+	//If lhs is a variable name, use that as an operand.
+	//Otherwise, compute the result and store it in a temporary
+	//Also checks for constants instead of using temporaries
+	if ((downcast = dynamic_cast<IdentifierExpression*>(lhs))) {
+		op1 += downcast->getName();
+	} else if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
+		op1 += downcast->getName();
+	} else {
+		op1 += to_string(s->getTemp());
+		lhs->genLLVM(s, o, op1);
+	}
+	//Same for rhs
+	if ((downcast = dynamic_cast<IdentifierExpression*>(rhs))) {
+		op2 += downcast->getName();
+	} else if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
+		op1 += downcastConst->getName();
+	} else {
+		op2 += to_string(s->getTemp());
+		lhs->genLLVM(s, o, op2);
+	}
+	o->put(result + " = ");
+	o->put(this->getLLVMOpName() + " ");
+	o->put(lhs->getType(s)->getLLVMName() + " ");
+	o->put(op1 + ", " + op2 + "\n");
+}
+
 
 template<class Left, class Middle, class Right, const string* opStrFirst, const string* opStrSecond, PriorityEnum prioTemp>
 void TernaryOperator<Left, Middle, Right, opStrFirst, opStrSecond, prioTemp> :: parse(Parser* parser) {

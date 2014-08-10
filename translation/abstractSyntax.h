@@ -44,6 +44,9 @@ class Node {
 		virtual void genLLVM(Scope* s, Consumer<string>* o) {
 			o->put(";No known assembly code for " + this->getName() + "\n");
 		}
+		virtual void genLLVM(Scope* s, Consumer<string>* o, string result) {
+			o->put(";No known assembly code for " + this->getName() + "\n");
+		}
 		virtual string getLLVMName() const {
 			return ";Deprecated";
 		}
@@ -101,12 +104,17 @@ class Operator : public Expression {
 	public:
 		Operator(Parser* parser, const string* opStr, PriorityEnum prio) \
 			: Expression(prio), parser(parser), opStr(*opStr) {}
+		Operator(Parser* parser, const string* opStr, PriorityEnum prio, \
+				string LLVMOpStr) : Expression(prio), parser(parser), \
+									opStr(*opStr), LLVMOpStr(LLVMOpStr) {}
 		virtual ~Operator() {}
 		string getName() {return opStr;}
+		virtual string getLLVMOpName() {return LLVMOpStr;}
 	protected:
 		Parser* parser;
 		const string opStr; //String representation of the punctuator for this
 		//operator, e.g. "+" for Addition.
+		const string LLVMOpStr = "NoLLVMOpStr";
 };
 
 enum BasicTypeEnum {_BOOL, CHAR, SIGNED_CHAR, UNSIGNED_CHAR, SHORT_INT, \
@@ -449,7 +457,11 @@ class UnionType : public Type {
 class Symbol {
 	public:
 		Symbol(Type* type) : type(type) {}
-		Type* getType() {return type;}
+		Type* getType() {
+			if (type != NULL) return type;
+			type = new NoType();
+			return type;
+		}
 		~Symbol() {
 			if (type != NULL) {delete type;}
 		}
@@ -490,9 +502,9 @@ class SymbolTable {
 
 class Scope {
 	public:
-		Scope() : table(new SymbolTable()), enclosing(NULL) {}
+		Scope() : table(new SymbolTable()), enclosing(NULL), tempNum(0) {}
 		Scope(Scope* enclosing) : table(new SymbolTable()), \
-								  enclosing(enclosing) {}
+								  enclosing(enclosing), tempNum(0) {}
 		Symbol* find(string key) {
 			Symbol* ret = NULL;
 			if (table != NULL) {
@@ -523,12 +535,14 @@ class Scope {
 		bool remove(string str) {
 			return table->remove(str);
 		}
+		unsigned int getTemp() {return ++tempNum;}
 		virtual ~Scope() {
 			if (table != NULL) {delete table;}
 		}
 	private:
 		SymbolTable* table = NULL;
 		Scope* enclosing = NULL;
+		unsigned int tempNum = 0;
 };
 
 class TypeError : public runtime_error {
