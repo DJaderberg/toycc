@@ -16,6 +16,46 @@ string ExternalDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 	return "";
 }
 
+string CompoundStatement :: genLLVM(Scope* s, Consumer<string>* o, ParameterTypeListDirectDeclarator* paramDirDecl) {
+			if  (paramDirDecl != NULL) {
+				if (ParameterTypeList* paramTypeList = paramDirDecl->getParams()) {
+					o->put("{");
+					TypeList* typeList = paramTypeList->getTypes(s);
+					list<string>* nameList = new list<string>();
+					paramTypeList->getNames(s, nameList);
+					string curTypeName = "";
+					unsigned int iter = 1;
+					while (typeList != NULL && !nameList->empty()) {
+						curTypeName = typeList->getItem()->getLLVMName();
+						o->put("\n%" + nameList->front() + " = alloca ");
+						o->put(curTypeName);
+						o->put("\nstore " + curTypeName + " %__arg_");
+						o->put(to_string(iter) + ", " + curTypeName);
+						o->put("* %" + nameList->front() + "\n");
+						nameList->pop_front();
+						typeList = typeList->getNext();
+						++iter;
+					}
+					//Handle 'void'
+					if (typeList != NULL && typeList->getItem() != NULL && \
+							typeList->getItem()->getLLVMName() == "void") {
+						typeList = NULL;
+					}
+					if (typeList != NULL || !nameList->empty()) {
+						string err = "Mismatched number of types and names";
+						throw new TypeError(err);
+					}
+					Scope* localScope = new Scope(s);
+					itemList->genLLVM(localScope, o);
+					delete localScope;
+					o->put("}\n");
+					return "";
+				}
+		}
+		return this->genLLVM(s, o);
+}
+
+
 ParameterDeclaration :: ~ParameterDeclaration() {
 	if (declSpecList != NULL) {delete declSpecList;}
 	if (decl != NULL) {delete decl;}
@@ -43,7 +83,7 @@ string ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 		}
 		delete declSpecType;
 	}
-	if (decl != NULL) {o->put(" %" + decl->getName());}
+	if (decl != NULL) {o->put(" %__arg_" + to_string(s->getTemp()));}
 	return "";
 }
 

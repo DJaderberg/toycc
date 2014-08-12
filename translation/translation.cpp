@@ -82,6 +82,7 @@ int translate(string filename) {
 			string ofilename = "/Users/David/toycc/test/ir.ll";
 			ofstream filestream = ofstream(ofilename);
 			Consumer<string>* llvmOutput = new StreamConsumer(filestream);
+			llvmOutput->put("target triple = \"x86_64-apple-macosx10.9.0\"\n");
 			ptr->genLLVM(scope, llvmOutput);
 			//cout << ptr->getType(scope)->getName() << '\n';
 		}

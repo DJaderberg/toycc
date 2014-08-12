@@ -214,6 +214,7 @@ class Enumerator;
 class EnumeratorList;
 class FunctionDefinition;
 class ParameterTypeList;
+class ParameterTypeListDirectDeclarator;
 class ParameterList;
 class ParameterDeclaration;
 class TypeQualifierList;
@@ -541,7 +542,9 @@ class CompoundStatement : public Statement {
 			o->put("}\n");
 			return "";
 		}
-		string getLLVMName() const {
+		//Special version to handle set up of parameters
+			string genLLVM(Scope* s, Consumer<string>* o, ParameterTypeListDirectDeclarator* paramDirDecl);
+			string getLLVMName() const {
 			string ret = "{\n";
 			if (itemList != NULL) {ret += itemList->getLLVMName();}
 			ret += "}\n";
@@ -1117,7 +1120,7 @@ class Declaration : public Node {
 					o->put("%" + idDirDecl->getIdentifier()->getName() + \
 							" = alloca " + declList->getType(s)->getLLVMName());
 				}
-			} else if (ParameterTypeListDirectDeclarator* paramDirDecl =\
+			} /*else if (ParameterTypeListDirectDeclarator* paramDirDecl =\
 					dynamic_cast<ParameterTypeListDirectDeclarator*>\
 					(nextDirDecl)) {
 				//It's a function declaration!
@@ -1133,7 +1136,7 @@ class Declaration : public Node {
 				o->put("(");
 				paramDirDecl->genLLVM(s, o);
 				o->put(")");
-			}
+			}*/
 			return "";
 		}
 	private:
@@ -1317,7 +1320,7 @@ class FunctionDefinition : public Node {
 			}
 			paramDirDecl->genLLVM(s, o);
 			o->put(") ");
-			state->genLLVM(s, o);
+			state->genLLVM(s, o, paramDirDecl);
 			return "";
 		}
 	private:
