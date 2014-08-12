@@ -225,6 +225,7 @@ class StructDeclaration;
 class SpecifierQualifierList;
 class StructDeclaratorList;
 class StructDeclarator;
+class ArgumentList;
 
 
 //Constructs an AST from the input Tokens
@@ -280,6 +281,7 @@ class Parser {
 		SpecifierQualifierList* parseSpecifierQualifierList();
 		StructDeclaratorList* parseStructDeclaratorList();
 		StructDeclarator* parseStructDeclarator();
+		ArgumentList* parseArgumentList();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -348,6 +350,10 @@ class Constant : public Identifier {
 			//TODO: Fix for weird constants
 			o->put(this->getName());
 		}
+		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
+			o->put(retOp + " = ");
+			this->genLLVM(s, o);
+		}
 };
 
 class EnumerationConstant : public Constant {
@@ -374,6 +380,14 @@ class IdentifierExpression : public Expression {
 		string getName() {return identifier->getName();}
 		void parse(Parser* parser) {}
 		bool typeCheck(Scope* s) {return identifier->typeCheck(s);}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			o->put("load "  + this->getType(s)->getLLVMName() + "* %" + \
+					identifier->getName());
+		}
+		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
+			o->put(retOp + " = ");
+			this->genLLVM(s, o);
+		}
 		Type* getType(Scope* s) {return identifier->getType(s);}
 	private:
 		Identifier* identifier = NULL;
@@ -411,6 +425,10 @@ class ConstantExpression : public Expression {
 			if (constant != NULL) {
 				constant->genLLVM(s, o);
 			}
+		}
+		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
+			o->put(retOp + " = ");
+			this->genLLVM(s, o);
 		}
 	private:
 		Constant* constant = NULL;
@@ -525,7 +543,9 @@ class CompoundStatement : public Statement {
 		}
 		void genLLVM(Scope* s, Consumer<string>* o) {
 			o->put("{\n");
-			itemList->genLLVM(s, o);
+			Scope* localScope = new Scope(s);
+			itemList->genLLVM(localScope, o);
+			delete localScope;
 			o->put("}\n");
 		}
 		string getLLVMName() const {
@@ -638,10 +658,15 @@ class JumpStatement : public Statement {
 				if (expr != NULL) {
 					Type* exprType = expr->getType(s);
 					if (exprType->getLLVMName() != "void") {
-						string retOp = "%" + to_string(s->getTemp());
-						expr->genLLVM(s, o, retOp);
-						o->put("ret " + exprType->getLLVMName() + " " + retOp + \
-								"\n");
+						if (IdentifierExpression* idExpr = dynamic_cast<IdentifierExpression*>(expr)) {
+							o->put("ret " + exprType->getLLVMName() + " %" + \
+									idExpr->getName() + "\n");
+						} else {
+							string retOp = "%" + to_string(s->getTemp());
+							expr->genLLVM(s, o, retOp);
+							o->put("\nret " + exprType->getLLVMName() + " " + \
+									retOp + "\n");
+						}
 					}
 				}
 			}
@@ -1005,6 +1030,7 @@ class InitDeclarator : public Node {
 			//TODO: Initialize variable as well
 			return dec->insert(s, type);
 		}
+		Declarator* getDeclarator() {return dec;}
 	private:
 		Declarator* dec;
 		Initializer* init;
@@ -1086,6 +1112,41 @@ class Declaration : public Node {
 			return declList->getType(s);
 		}
 		bool typeCheck(Scope* s) {
+			return this->add(s);
+		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			this->add(s);
+			Declarator* decl = initList->getItem()->getDeclarator();
+			DirectDeclarator* dirDecl = decl->getDirectDeclarator();
+			DirectDeclarator* nextDirDecl = dirDecl->getNext();
+			if (nextDirDecl == NULL) {
+				//Could be an IdentifierDirectDeclarator or '(declarator)'
+				//TODO: If identifier, allocate it?
+				if (IdentifierDirectDeclarator* idDirDecl = dynamic_cast<IdentifierDirectDeclarator*>(dirDecl)) {
+					o->put("%" + idDirDecl->getIdentifier()->getName() + \
+							" = alloca " + declList->getType(s)->getLLVMName());
+				}
+			} else if (ParameterTypeListDirectDeclarator* paramDirDecl =\
+					dynamic_cast<ParameterTypeListDirectDeclarator*>\
+					(nextDirDecl)) {
+				//It's a function declaration!
+				//Has to be possible to downcast dirDecl to IdentifierDirDecl
+				if (IdentifierDirectDeclarator* idDirDecl = \
+						dynamic_cast<IdentifierDirectDeclarator*>(dirDecl)) {
+					o->put("declare " + declList->getType(s)->getLLVMName());
+					o->put(" @" + idDirDecl->getIdentifier()->getName());
+				} else {
+					string err = "Expected identifier to name function";
+					throw new TypeError(err);
+				}
+				o->put("(");
+				paramDirDecl->genLLVM(s, o);
+				o->put(")");
+			}
+		}
+	private:
+		//Add all variables in this declaration to the scope
+		bool add(Scope* s) {
 			if (declList == NULL || initList == NULL) {
 				return false;
 			} else {
@@ -1111,7 +1172,6 @@ class Declaration : public Node {
 				}
 			}
 		}
-	private:
 		DeclarationSpecifierList* declList = NULL;
 		InitDeclaratorList* initList = NULL;
 };
@@ -1235,7 +1295,8 @@ class FunctionDefinition : public Node {
 			}
 			return ret;
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		void genLLVM(Scope* oldScope, Consumer<string>* o) {
+			Scope* s = new Scope(oldScope);
 			o->put("\n;Function Attrs: ");
 			//TODO: Implement function attributes, if necessary
 			o->put("\ndefine ");
@@ -1254,7 +1315,7 @@ class FunctionDefinition : public Node {
 				string err = "Expected identifier as function name";
 				throw new TypeError(err);
 			}
-			o->put(dirDecl->getIdentifier()->getName() + " (");
+			o->put(dirDecl->getIdentifier()->getName() + "(");
 			ParameterTypeListDirectDeclarator* paramDirDecl \
 				= dynamic_cast<ParameterTypeListDirectDeclarator*>\
 				(dirDecl->getNext());
@@ -1602,7 +1663,11 @@ class StandardAssignment : public Assignment<&StandardAssignmentOpStr> {
 						dynamic_cast<ConstantExpression*>(rhs)) {
 				o->put("%" + lhs->getName() + " = " + constDowncast->getName());
 			} else {
-				rhs->genLLVM(s, o, "%" + lhs->getName());
+				string temp = "%" + to_string(s->getTemp());
+				rhs->genLLVM(s, o, temp);
+				string type = lhs->getType(s)->getLLVMName();
+				o->put("\nstore " + type + " " + temp + ", " + type + "* " + \
+						"%" + lhs->getName());
 			}
 		}
 };
@@ -2154,6 +2219,34 @@ class ArraySubscript : public BinaryOperator<Expression, &ArraySubscriptOpStr, P
 		}
 };
 
+class ArgumentList : public Expression {
+	public:
+		ArgumentList(Expression* assignExpr, ArgumentList* next) : \
+			Expression(DEFAULT), expr(assignExpr), next(next) {}
+		void parse(Parser* parser) {
+		}
+		string getName() {
+			string ret = "";
+			if (expr != NULL) {ret += expr->getName();}
+			if (next != NULL) {ret += next->getName();}
+			return ret;
+		}
+		void genLLVM(Scope* s, Consumer<string>* o) {
+			if (expr != NULL) {
+				Type* type = expr->getType(s);
+				o->put(type->getLLVMName() + " ");
+				expr->genLLVM(s, o);
+			}
+			if (next != NULL) {
+				o->put(", ");
+				next->genLLVM(s, o);
+			}
+		}
+	private:
+		Expression* expr = NULL;
+		ArgumentList* next = NULL;
+};
+
 const string FunctionCallOpStr = "(";
 class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTFIX> {
 	public:
@@ -2162,8 +2255,9 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 		static FunctionCall* create(Parser* parser, Expression* lhs) \
 		{return new FunctionCall(parser, lhs);}
 		void parse(Parser* parser) {
-			rhs = parser->parseExpression(); //With DEFAULT priority, since we're in a
-			//pair of parenthesis
+			if (parser->getSource()->peek().getName() != ")") {
+			rhs = parser->parseArgumentList();
+			}
 			Token token = parser->getSource()->get();
 			if (token.getName() != ")") {
 				string err = "Expected ')' at end of function ";
@@ -2194,7 +2288,10 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 				} else {
 					o->put("void");
 				}
-				o->put(" " + lhs->getName() + "(");
+				o->put(" @" + lhs->getName() + "(");
+				//TODO: This does not include types, which is required by LLVM IR
+				rhs->genLLVM(s, o);
+				o->put(")");
 			} else {
 				string err = "Unknown return type of function";
 				throw new TypeError(err);
@@ -2323,27 +2420,29 @@ void BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<strin
 	//If lhs is a variable name, use that as an operand.
 	//Otherwise, compute the result and store it in a temporary
 	//Also checks for constants instead of using temporaries
-	if ((downcast = dynamic_cast<IdentifierExpression*>(lhs))) {
+	/*if ((downcast = dynamic_cast<IdentifierExpression*>(lhs))) {
 		op1 += downcast->getName();
-	} else if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
-		op1 += downcast->getName();
+	} else*/ if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
+		op1 = downcast->getName();
 	} else {
 		op1 += to_string(s->getTemp());
 		lhs->genLLVM(s, o, op1);
+		o->put("\n");
 	}
 	//Same for rhs
-	if ((downcast = dynamic_cast<IdentifierExpression*>(rhs))) {
+	/*if ((downcast = dynamic_cast<IdentifierExpression*>(rhs))) {
 		op2 += downcast->getName();
-	} else if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
-		op1 += downcastConst->getName();
+	} else */if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
+		op2 = downcastConst->getName();
 	} else {
 		op2 += to_string(s->getTemp());
-		lhs->genLLVM(s, o, op2);
+		rhs->genLLVM(s, o, op2);
+		o->put("\n");
 	}
 	o->put(result + " = ");
 	o->put(this->getLLVMOpName() + " ");
 	o->put(lhs->getType(s)->getLLVMName() + " ");
-	o->put(op1 + ", " + op2 + "\n");
+	o->put(op1 + ", " + op2 );
 }
 
 

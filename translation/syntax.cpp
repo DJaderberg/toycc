@@ -9,7 +9,10 @@ string ExternalDeclaration :: getName() {
 
 void ExternalDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 	if (funcDef != NULL) {funcDef->genLLVM(s, o);}
-	if (decl != NULL) {decl->genLLVM(s, o);}
+	if (decl != NULL) {
+		//TODO: Implement global declarations
+		decl->genLLVM(s, o);
+	}
 }
 
 ParameterDeclaration :: ~ParameterDeclaration() {
@@ -28,7 +31,15 @@ void ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 	if (declSpecList != NULL) {
 		//Should never need scope in getting type
 		Type* declSpecType = declSpecList->getType(s);
-		o->put(declSpecType->getLLVMName());
+		string typeName = declSpecType->getLLVMName();
+		if (typeName != "void") {
+			//A parameter of 'void' in C is nothing in LLVM IR, eg.
+			//C: int main(void)
+			//becomes
+			//LLVM IR: i64 @main()
+			//So, do not enter anything if typeName is void
+			o->put(typeName);
+		}
 		delete declSpecType;
 	}
 	if (decl != NULL) {o->put(" %" + decl->getName());}
@@ -1065,6 +1076,16 @@ Initializer* Parser :: parseInitializer() {
 	//TODO: Implement initializer-lists
 	Expression* expr = parseExpression(ASSIGNMENT);
 	return new Initializer(expr);
+}
+
+ArgumentList* Parser :: parseArgumentList() {
+	Expression* expr = parseExpression(ASSIGNMENT);
+	if (source->peek().getName() == ",") {
+		source->get();
+		return new ArgumentList(expr, parseArgumentList());
+	} else {
+		return new ArgumentList(expr, NULL);
+	}
 }
 
 void Parser :: c11Operators() {
