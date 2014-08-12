@@ -39,9 +39,6 @@ class InfixOperator : public Operator {
 	public:
 		InfixOperator(Parser* parser, const string* opStr, PriorityEnum prio) \
 			: Operator(parser, opStr, prio) {}
-		InfixOperator(Parser* parser, const string* opStr, PriorityEnum prio, \
-				string LLVMOpStr) \
-			: Operator(parser, opStr, prio, LLVMOpStr) {}
 		virtual ~InfixOperator() {}
 };
 
@@ -70,8 +67,6 @@ class BinaryOperator : public InfixOperator {
 									 lhs(lhs) {}*/
 		BinaryOperator(Parser* parser, Op* lhs) : \
 			InfixOperator(parser, opStrTemp, prioTemp), lhs(lhs) {}
-		BinaryOperator(Parser* parser, Op* lhs, string LLVMOpStr) : \
-			InfixOperator(parser, opStrTemp, prioTemp, LLVMOpStr), lhs(lhs) {}
 		virtual ~BinaryOperator() {
 			if (rhs != NULL) {delete rhs;}
 			if (lhs != NULL) {delete lhs;}
@@ -1115,7 +1110,6 @@ class Declaration : public Node {
 			DirectDeclarator* nextDirDecl = dirDecl->getNext();
 			if (nextDirDecl == NULL) {
 				//Could be an IdentifierDirectDeclarator or '(declarator)'
-				//TODO: If identifier, allocate it?
 				if (IdentifierDirectDeclarator* idDirDecl = dynamic_cast<IdentifierDirectDeclarator*>(dirDecl)) {
 					o->put("%" + idDirDecl->getIdentifier()->getName() + \
 							" = alloca " + declList->getType(s)->getLLVMName());
@@ -1888,27 +1882,66 @@ const string AdditionOpStr = "+";
 class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 	public:
 		Addition(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs, "add") {}
+			: BinaryOperator(parser, lhs) {}
 		static Addition* create(Parser* parser, Expression* lhs) \
 		{return new Addition(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fadd";
+					case DOUBLE : return "fadd";
+					case LONG_DOUBLE : return "fadd";
+					default : return "add";
+				}
+			} else {
+				return "add";
+			}
+		}
 };
 
 const string SubtractionOpStr = "-";
 class Subtraction : public BinaryOperator<Expression, &SubtractionOpStr, ADDITIVE> {
 	public:
 		Subtraction(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs, "sub") {}
+			: BinaryOperator(parser, lhs) {}
 		static Subtraction* create(Parser* parser, Expression* lhs) \
 		{return new Subtraction(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fsub";
+					case DOUBLE : return "fsub";
+					case LONG_DOUBLE : return "fsub";
+					default : return "sub";
+				}
+			} else {
+				return "sub";
+			}
+		}
 };
 
 const string MultiplicationOpStr = "*";
 class Multiplication : public BinaryOperator<Expression, &MultiplicationOpStr, MULTIPLICATIVE> {
 	public:
 		Multiplication(Parser* parser, Expression* lhs) \
-			: BinaryOperator(parser, lhs, "mul") {}
+			: BinaryOperator(parser, lhs) {}
 		static Multiplication* create(Parser* parser, Expression* lhs) \
 		{return new Multiplication(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fmul";
+					case DOUBLE : return "fmul";
+					case LONG_DOUBLE : return "fmul";
+					default : return "mul";
+				}
+			} else {
+				return "mul";
+			}
+		}
 };
 
 const string DivisionOpStr = "/";
@@ -1918,6 +1951,23 @@ class Division : public BinaryOperator<Expression, &DivisionOpStr, MULTIPLICATIV
 			: BinaryOperator(parser, lhs) {}
 		static Division* create(Parser* parser, Expression* lhs) \
 		{return new Division(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "udiv";
+					case UNSIGNED_SHORT_INT : return "udiv";
+					case UNSIGNED_INT : return "udiv";
+					case UNSIGNED_LONG_INT : return "udiv";
+					case UNSIGNED_LONG_LONG_INT : return "udiv";
+					case FLOAT : return "fdiv";
+					case DOUBLE : return "fdiv";
+					case LONG_DOUBLE : return "fdiv";
+					default : return "sdiv";
+				}
+			}
+			return "sdiv";
+		}
 };
 
 const string ModuloOpStr = "%";
@@ -1927,6 +1977,24 @@ class Modulo : public BinaryOperator<Expression, &ModuloOpStr, MULTIPLICATIVE> {
 			: BinaryOperator(parser, lhs) {}
 		static Modulo* create(Parser* parser, Expression* lhs) \
 		{return new Modulo(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "urem";
+					case UNSIGNED_SHORT_INT : return "urem";
+					case UNSIGNED_INT : return "urem";
+					case UNSIGNED_LONG_INT : return "urem";
+					case UNSIGNED_LONG_LONG_INT : return "urem";
+					case FLOAT : return "frem";
+					case DOUBLE : return "frem";
+					case LONG_DOUBLE : return "frem";
+					default : return "srem";
+				}
+			}
+			return "srem";
+		}
+
 };
 
 const string TypeCastOpStr = "(";
@@ -2432,7 +2500,7 @@ string BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<str
 	}
 	string result = "%" + to_string(s->getTemp());
 	o->put(result + " = ");
-	o->put(this->getLLVMOpName() + " ");
+	o->put(this->getLLVMOpName(lhs->getType(s)) + " ");
 	o->put(lhs->getType(s)->getLLVMName() + " ");
 	o->put(op1 + ", " + op2 );
 	return result;

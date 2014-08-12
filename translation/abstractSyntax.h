@@ -102,17 +102,13 @@ class Operator : public Expression {
 	public:
 		Operator(Parser* parser, const string* opStr, PriorityEnum prio) \
 			: Expression(prio), parser(parser), opStr(*opStr) {}
-		Operator(Parser* parser, const string* opStr, PriorityEnum prio, \
-				string LLVMOpStr) : Expression(prio), parser(parser), \
-									opStr(*opStr), LLVMOpStr(LLVMOpStr) {}
 		virtual ~Operator() {}
 		string getName() {return opStr;}
-		virtual string getLLVMOpName() {return LLVMOpStr;}
+		virtual string getLLVMOpName(Type* t) {return "NoLLVMOpStr";}
 	protected:
 		Parser* parser;
 		const string opStr; //String representation of the punctuator for this
 		//operator, e.g. "+" for Addition.
-		const string LLVMOpStr = "NoLLVMOpStr";
 };
 
 enum BasicTypeEnum {_BOOL, CHAR, SIGNED_CHAR, UNSIGNED_CHAR, SHORT_INT, \
@@ -223,8 +219,8 @@ class BasicType : public Type {
 				case UNSIGNED_INT : return "i64";
 				case LONG_INT : return "i64";
 				case UNSIGNED_LONG_INT : return "i64";
-				case LONG_LONG_INT : return "i64";
-				case UNSIGNED_LONG_LONG_INT : return "i64";
+				case LONG_LONG_INT : return "i128";
+				case UNSIGNED_LONG_LONG_INT : return "i128";
 				case FLOAT : return "float";
 				case DOUBLE : return "double";
 				case LONG_DOUBLE : return "fp128";

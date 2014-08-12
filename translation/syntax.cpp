@@ -36,10 +36,11 @@ string CompoundStatement :: genLLVM(Scope* s, Consumer<string>* o, ParameterType
 						typeList = typeList->getNext();
 						++iter;
 					}
-					//Handle 'void'
+					//Handle 'void' argument
 					if (typeList != NULL && typeList->getItem() != NULL && \
 							typeList->getItem()->getLLVMName() == "void") {
 						typeList = NULL;
+						o->put("\n");
 					}
 					if (typeList != NULL || !nameList->empty()) {
 						string err = "Mismatched number of types and names";
@@ -1290,7 +1291,14 @@ map<string, BasicTypeEnum> DeclarationSpecifierList :: initBasicTypesMap() {
 		{"unsigned long int", UNSIGNED_LONG_INT}, \
 		{"long long int", LONG_LONG_INT}, \
 		{"unsigned long long int", UNSIGNED_LONG_LONG_INT}, \
-		{"float", FLOAT}, {"double", DOUBLE}, {"long double", LONG_DOUBLE}\
+		{"float", FLOAT}, {"double", DOUBLE}, {"long double", LONG_DOUBLE}, \
+		{"short", SHORT_INT}, {"signed short", SHORT_INT}, \
+		{"signed short int", SHORT_INT}, {"unsigned short", UNSIGNED_SHORT_INT},\
+		{"signed", INT}, {"signed int", INT}, {"unsigned", UNSIGNED_INT}, \
+		{"long", LONG_INT}, {"signed long", LONG_INT}, \
+		{"signed long int", LONG_INT}, {"unsigned long", UNSIGNED_LONG_INT}, \
+		{"long long", LONG_LONG_INT}, {"signed long long", LONG_LONG_INT}, \
+		{"signed long long int", LONG_LONG_INT}\
 	};
 	return ret;
 }
