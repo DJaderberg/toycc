@@ -1266,6 +1266,7 @@ Type* DeclarationSpecifierList :: getType(Scope* s) {
 		if (curNext != NULL) {
 			curItem = curNext->getItem();
 			curNext = curNext->getNext();
+			basicTypeName += " ";
 		} else {
 			break;
 		}
