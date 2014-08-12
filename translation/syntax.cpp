@@ -7,12 +7,13 @@ string ExternalDeclaration :: getName() {
 	return ret;
 }
 
-void ExternalDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
-	if (funcDef != NULL) {funcDef->genLLVM(s, o);}
+string ExternalDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (funcDef != NULL) {return funcDef->genLLVM(s, o);}
 	if (decl != NULL) {
 		//TODO: Implement global declarations
-		decl->genLLVM(s, o);
+		return decl->genLLVM(s, o);
 	}
+	return "";
 }
 
 ParameterDeclaration :: ~ParameterDeclaration() {
@@ -27,7 +28,7 @@ string ParameterDeclaration :: getName() {
 	return ret;
 }
 
-void ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
+string ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 	if (declSpecList != NULL) {
 		//Should never need scope in getting type
 		Type* declSpecType = declSpecList->getType(s);
@@ -43,6 +44,7 @@ void ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
 		delete declSpecType;
 	}
 	if (decl != NULL) {o->put(" %" + decl->getName());}
+	return "";
 }
 
 Type* ParameterDeclaration :: getType(Scope* s) {
@@ -96,9 +98,10 @@ Type* BlockItem :: getType(Scope* s) {
 	return new NoType();
 }
 
-void BlockItem :: genLLVM(Scope* s, Consumer<string>* o) {
-	if (decl != NULL) {decl->genLLVM(s, o);}
-	if (state != NULL) {state->genLLVM(s, o);}
+string BlockItem :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (decl != NULL) {return decl->genLLVM(s, o);}
+	if (state != NULL) {return state->genLLVM(s, o);}
+	return "";
 }
 
 string Pointer :: getName() {

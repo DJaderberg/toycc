@@ -117,10 +117,7 @@ class BinaryOperator : public InfixOperator {
 		virtual Type* getType(Scope* s) {
 			return lhs->getType(s);
 		}
-		virtual void genLLVM(Scope* s, Consumer<string>* o) {
-			o->put("dunno binary op");
-		}
-		virtual void genLLVM(Scope* s, Consumer<string>* o, string result);
+		virtual string genLLVM(Scope* s, Consumer<string>* o);
 		void parse(Parser* parser);
 	protected:
 		Op* rhs = NULL; //The right hand side 
@@ -346,13 +343,9 @@ class Constant : public Identifier {
 		Type* getType(Scope* s) {return this->getType(token.getName());}
 		static Type* getType(string str); //ints and doubles only
 		bool typeCheck(Scope* s) {return true;}
-		void genLLVM(Scope* s, Consumer<string>* o) {
-			//TODO: Fix for weird constants
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			o->put(this->getName());
-		}
-		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
-			o->put(retOp + " = ");
-			this->genLLVM(s, o);
+			return "";
 		}
 };
 
@@ -380,13 +373,12 @@ class IdentifierExpression : public Expression {
 		string getName() {return identifier->getName();}
 		void parse(Parser* parser) {}
 		bool typeCheck(Scope* s) {return identifier->typeCheck(s);}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			string retOp = "%" + to_string(s->getTemp());
+			o->put(retOp + " = ");
 			o->put("load "  + this->getType(s)->getLLVMName() + "* %" + \
 					identifier->getName());
-		}
-		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
-			o->put(retOp + " = ");
-			this->genLLVM(s, o);
+			return retOp;
 		}
 		Type* getType(Scope* s) {return identifier->getType(s);}
 	private:
@@ -421,14 +413,13 @@ class ConstantExpression : public Expression {
 		void parse(Parser* parser) {}
 		Type* getType(Scope* s) {return constant->getType(s);}
 		bool typeCheck(Scope* s) {return constant->typeCheck(s);}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			//string retOp = "%" + to_string(s->getTemp());
+			//o->put(retOp + " = ");
 			if (constant != NULL) {
 				constant->genLLVM(s, o);
 			}
-		}
-		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
-			o->put(retOp + " = ");
-			this->genLLVM(s, o);
+			return "";
 		}
 	private:
 		Constant* constant = NULL;
@@ -461,7 +452,7 @@ class ExternalDeclaration : public Node {
 		ExternalDeclaration(Declaration* decl) : decl(decl) {}
 		string getName();
 		bool typeCheck(Scope* s);
-		void genLLVM(Scope* s, Consumer<string>* o);
+		string genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		FunctionDefinition* funcDef = NULL;
 		Declaration* decl = NULL;
@@ -488,7 +479,7 @@ class BlockItem : public Node {
 		string getName();
 		bool typeCheck(Scope* s); 
 		Type* getType(Scope* s);
-		void genLLVM(Scope* s, Consumer<string>* o);
+		string genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		Declaration* decl = NULL;
 		Statement* state = NULL;
@@ -504,12 +495,13 @@ class BlockItemList : public NodeList<BlockItem> {
 			if (next != NULL) {ret += "\n" + next->getName();}
 			return ret;
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			if (item != NULL) {item->genLLVM(s, o);}
 			if (next != NULL) {
 				o->put("\n");
 				next->genLLVM(s, o);
 			}
+			return "";
 		}
 };
 
@@ -541,12 +533,13 @@ class CompoundStatement : public Statement {
 			delete localScope;
 			return ret;
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			o->put("{\n");
 			Scope* localScope = new Scope(s);
 			itemList->genLLVM(localScope, o);
 			delete localScope;
 			o->put("}\n");
+			return "";
 		}
 		string getLLVMName() const {
 			string ret = "{\n";
@@ -575,10 +568,11 @@ class ExpressionStatement : public Statement {
 		virtual bool typeCheck(Scope* s) {
 			return expression->typeCheck(s);
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			if (expression != NULL) {
-				expression->genLLVM(s, o);
+				return expression->genLLVM(s, o);
 			}
+			return "";
 		}
 	private:
 		Expression* expression = NULL; //Optional
@@ -652,24 +646,19 @@ class JumpStatement : public Statement {
 				return true;
 			}
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			//TODO: Implement all keywords
 			if (keyword == "return") {
 				if (expr != NULL) {
 					Type* exprType = expr->getType(s);
 					if (exprType->getLLVMName() != "void") {
-						if (IdentifierExpression* idExpr = dynamic_cast<IdentifierExpression*>(expr)) {
-							o->put("ret " + exprType->getLLVMName() + " %" + \
-									idExpr->getName() + "\n");
-						} else {
-							string retOp = "%" + to_string(s->getTemp());
-							expr->genLLVM(s, o, retOp);
-							o->put("\nret " + exprType->getLLVMName() + " " + \
+						string retOp = expr->genLLVM(s, o);
+						o->put("\nret " + exprType->getLLVMName() + " " + \
 									retOp + "\n");
-						}
 					}
 				}
 			}
+			return "";
 		}
 
 	private:
@@ -882,7 +871,7 @@ class ParameterDeclaration : public Node {
 		string getName();
 		Type* getType(Scope* s);
 		Declarator* getDeclarator() {return decl;}
-		void genLLVM(Scope* s, Consumer<string>* o);
+		string genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
@@ -948,9 +937,10 @@ class ParameterTypeList : public Node {
 			if (hasTrailing) {ret += ", ...";}
 			return ret;
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			if (paramList != NULL) {paramList->genLLVM(s, o);}
 			if (hasTrailing) {o->put(", ...");}
+			return "";
 		}
 		TypeList* getTypes(Scope* s) {return paramList->getTypes(s);}
 		void getNames(Scope* s, list<string>* ret) {
@@ -967,8 +957,9 @@ class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 		virtual ~ParameterTypeListDirectDeclarator();
 		string getName();
 		ParameterTypeList* getParams() {return params;}
-		void genLLVM(Scope* s, Consumer<string>* o) {
-			if (params != NULL) {params->genLLVM(s, o);}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (params != NULL) {return params->genLLVM(s, o);}
+			return "";
 		}
 	private:
 		ParameterTypeList* params = NULL;
@@ -1114,7 +1105,7 @@ class Declaration : public Node {
 		bool typeCheck(Scope* s) {
 			return this->add(s);
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			this->add(s);
 			Declarator* decl = initList->getItem()->getDeclarator();
 			DirectDeclarator* dirDecl = decl->getDirectDeclarator();
@@ -1143,6 +1134,7 @@ class Declaration : public Node {
 				paramDirDecl->genLLVM(s, o);
 				o->put(")");
 			}
+			return "";
 		}
 	private:
 		//Add all variables in this declaration to the scope
@@ -1295,7 +1287,7 @@ class FunctionDefinition : public Node {
 			}
 			return ret;
 		}
-		void genLLVM(Scope* oldScope, Consumer<string>* o) {
+		string genLLVM(Scope* oldScope, Consumer<string>* o) {
 			Scope* s = new Scope(oldScope);
 			o->put("\n;Function Attrs: ");
 			//TODO: Implement function attributes, if necessary
@@ -1326,13 +1318,14 @@ class FunctionDefinition : public Node {
 			paramDirDecl->genLLVM(s, o);
 			o->put(") ");
 			state->genLLVM(s, o);
+			return "";
 		}
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
 		DeclarationList* declList = NULL; //Optional
 		CompoundStatement* state = NULL;
-		FunctionType* typeOfThis = NULL; //Set when running typeCheck(s)
+		FunctionType* typeOfThis = NULL; //Set when running getType(s)
 };
 
 class TypeSpecifier : public DeclarationSpecifier {
@@ -1654,21 +1647,20 @@ class StandardAssignment : public Assignment<&StandardAssignmentOpStr> {
 			: Assignment(parser, lhs) {}
 		static StandardAssignment* create(Parser* parser, Expression* lhs)\
 	   	{return new StandardAssignment(parser, lhs);}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			//Assume that the name of rhs is an identifier and store the
 			//result of rhs there
-			if (IdentifierExpression* idDowncast = dynamic_cast<IdentifierExpression*>(rhs)) {
-				o->put("%" + lhs->getName() + " = %" + idDowncast->getName());
-			} else if (ConstantExpression* constDowncast = \
+			string type = lhs->getType(s)->getLLVMName();
+			if (ConstantExpression* constDowncast = \
 						dynamic_cast<ConstantExpression*>(rhs)) {
-				o->put("%" + lhs->getName() + " = " + constDowncast->getName());
+				o->put("store " + type + " " + constDowncast->getName() + ", "\
+						+ type + "* " + "%" + lhs->getName());
 			} else {
-				string temp = "%" + to_string(s->getTemp());
-				rhs->genLLVM(s, o, temp);
-				string type = lhs->getType(s)->getLLVMName();
+				string temp = rhs->genLLVM(s, o);
 				o->put("\nstore " + type + " " + temp + ", " + type + "* " + \
 						"%" + lhs->getName());
 			}
+			return "";
 		}
 };
 
@@ -2231,16 +2223,17 @@ class ArgumentList : public Expression {
 			if (next != NULL) {ret += next->getName();}
 			return ret;
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
+		string genLLVM(Scope* s, Consumer<string>* o) {
 			if (expr != NULL) {
 				Type* type = expr->getType(s);
 				o->put(type->getLLVMName() + " ");
-				expr->genLLVM(s, o);
+				return expr->genLLVM(s, o);
 			}
 			if (next != NULL) {
 				o->put(", ");
-				next->genLLVM(s, o);
+				return next->genLLVM(s, o);
 			}
+			return "";
 		}
 	private:
 		Expression* expr = NULL;
@@ -2277,8 +2270,9 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 				return ret;
 			}
 		}
-		void genLLVM(Scope* s, Consumer<string>* o) {
-			//We should not care about any return values
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			string retOp = "%" + to_string(s->getTemp());
+			o->put(retOp + " = ");
 			o->put("call ");
 			Symbol* symbol = s->find(lhs->getName());
 			if (symbol != NULL) {
@@ -2289,17 +2283,13 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 					o->put("void");
 				}
 				o->put(" @" + lhs->getName() + "(");
-				//TODO: This does not include types, which is required by LLVM IR
 				rhs->genLLVM(s, o);
 				o->put(")");
 			} else {
 				string err = "Unknown return type of function";
 				throw new TypeError(err);
 			}
-		}
-		void genLLVM(Scope* s, Consumer<string>* o, string retOp) {
-			o->put(retOp + " = ");
-			this->genLLVM(s, o);
+			return retOp;
 		}
 };
 
@@ -2412,7 +2402,7 @@ void BinaryOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
 }
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
-void BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<string>* o, string result) {
+string BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<string>* o) {
 	string op1 = "%";
 	string op2 = "%";
 	IdentifierExpression* downcast = NULL;
@@ -2425,8 +2415,7 @@ void BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<strin
 	} else*/ if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
 		op1 = downcast->getName();
 	} else {
-		op1 += to_string(s->getTemp());
-		lhs->genLLVM(s, o, op1);
+		op1 = lhs->genLLVM(s, o);
 		o->put("\n");
 	}
 	//Same for rhs
@@ -2435,14 +2424,15 @@ void BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<strin
 	} else */if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
 		op2 = downcastConst->getName();
 	} else {
-		op2 += to_string(s->getTemp());
-		rhs->genLLVM(s, o, op2);
+		op2 = rhs->genLLVM(s, o);
 		o->put("\n");
 	}
+	string result = "%" + to_string(s->getTemp());
 	o->put(result + " = ");
 	o->put(this->getLLVMOpName() + " ");
 	o->put(lhs->getType(s)->getLLVMName() + " ");
 	o->put(op1 + ", " + op2 );
+	return result;
 }
 
 

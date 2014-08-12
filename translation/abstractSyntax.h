@@ -41,11 +41,9 @@ class Node {
 		virtual string getName() = 0; //Returns string representation of object
 		virtual Type* getType(Scope* s);
 		virtual bool typeCheck(Scope* s);
-		virtual void genLLVM(Scope* s, Consumer<string>* o) {
+		virtual string genLLVM(Scope* s, Consumer<string>* o) {
 			o->put(";No known assembly code for " + this->getName() + "\n");
-		}
-		virtual void genLLVM(Scope* s, Consumer<string>* o, string result) {
-			o->put(";No known assembly code for " + this->getName() + "\n");
+			return "";
 		}
 		virtual string getLLVMName() const {
 			return ";Deprecated";
@@ -77,7 +75,7 @@ class NodeList : public Node {
 		virtual Type* getType(Scope* s) {return item->getType(s);}	
 		virtual TypeList* getTypes(Scope* s);
 		virtual bool typeCheck(Scope* scope);
-		virtual void genLLVM(Scope* s, Consumer<string>* output);
+		virtual string genLLVM(Scope* s, Consumer<string>* output);
 		T* getItem() {return item;}
 		NodeList* getNext() {return next;}
 		void getNames(Scope* s, list<string>* ret);
@@ -576,7 +574,7 @@ bool NodeList<T> :: typeCheck(Scope* s, Type* t) {
 }
 
 template<class T>
-void NodeList<T> :: genLLVM(Scope* s, Consumer<string>* o) {
+string NodeList<T> :: genLLVM(Scope* s, Consumer<string>* o) {
 	if (item != NULL) {
 		item->genLLVM(s, o);
 	}
@@ -584,6 +582,7 @@ void NodeList<T> :: genLLVM(Scope* s, Consumer<string>* o) {
 		o->put("\n");
 		next->genLLVM(s, o);
 	}
+	return "";
 }
 
 template<class T>
