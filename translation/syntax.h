@@ -1786,6 +1786,9 @@ class BitwiseOR : public BinaryOperator<Expression, &BitwiseOROpStr, BITWISE_OR>
 			: BinaryOperator(parser, lhs) {}
 		static BitwiseOR* create(Parser* parser, Expression* lhs)\
 	   	{return new BitwiseOR(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			return "or";
+		}
 };
 
 const string BitwiseXOROpStr = "^";
@@ -1795,6 +1798,9 @@ class BitwiseXOR : public BinaryOperator<Expression, &BitwiseXOROpStr, BITWISE_X
 			: BinaryOperator(parser, lhs) {}
 		static BitwiseXOR* create(Parser* parser, Expression* lhs)\
 	   	{return new BitwiseXOR(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			return "xor";
+		}
 };
 
 const string BitwiseANDOpStr = "&";
@@ -1804,6 +1810,9 @@ class BitwiseAND : public BinaryOperator<Expression, &BitwiseANDOpStr , BITWISE_
 			: BinaryOperator(parser, lhs) {}
 		static BitwiseAND* create(Parser* parser, Expression* lhs)\
 	   	{return new BitwiseAND(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			return "and";
+		}
 };
 
 const string EqualityOpStr = "==";
@@ -1813,6 +1822,18 @@ class Equality : public BinaryOperator<Expression, &EqualityOpStr, EQUALITY> {
 			: BinaryOperator(parser, lhs) {}
 		static Equality* create(Parser* parser, Expression* lhs)\
 	   	{return new Equality(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fcmp ueq";
+					case DOUBLE : return "fcmp ueq";
+					case LONG_DOUBLE : return "fcmp ueq";
+					default : return "imcp eq";
+				}
+			}
+			return "icmp eq";
+		}
 };
 
 const string NonEqualityOpStr = "!=";
@@ -1822,6 +1843,18 @@ class NonEquality : public BinaryOperator<Expression, &NonEqualityOpStr, EQUALIT
 			: BinaryOperator(parser, lhs) {}
 		static NonEquality* create(Parser* parser, Expression* lhs)\
 	   	{return new NonEquality(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fcmp une";
+					case DOUBLE : return "fcmp une";
+					case LONG_DOUBLE : return "fcmp une";
+					default : return "imcp ne";
+				}
+			}
+			return "icmp ne";
+		}
 };
 
 const string LessThanOpStr = "<";
@@ -1831,6 +1864,23 @@ class LessThan : public BinaryOperator<Expression, &LessThanOpStr, RELATIONAL> {
 			: BinaryOperator(parser, lhs) {}
 		static LessThan* create(Parser* parser, Expression* lhs)\
 	   	{return new LessThan(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp ult";
+					case UNSIGNED_SHORT_INT : return "icmp ult";
+					case UNSIGNED_INT : return "icmp ult";
+					case UNSIGNED_LONG_INT : return "icmp ult";
+					case UNSIGNED_LONG_LONG_INT : return "icmp ult";
+					case FLOAT : return "fcmp ult";
+					case DOUBLE : return "fcmp ult";
+					case LONG_DOUBLE : return "fcmp ult";
+					default : return "imcp slt";
+				}
+			}
+			return "icmp slt";
+		}
 };
 
 const string GreaterThanOpStr = ">";
@@ -1840,6 +1890,24 @@ class GreaterThan : public BinaryOperator<Expression, &GreaterThanOpStr, RELATIO
 			: BinaryOperator(parser, lhs) {}
 		static GreaterThan* create(Parser* parser, Expression* lhs)\
 	   	{return new GreaterThan(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp ugt";
+					case UNSIGNED_SHORT_INT : return "icmp ugt";
+					case UNSIGNED_INT : return "icmp ugt";
+					case UNSIGNED_LONG_INT : return "icmp ugt";
+					case UNSIGNED_LONG_LONG_INT : return "icmp ugt";
+					case FLOAT : return "fcmp ugt";
+					case DOUBLE : return "fcmp ugt";
+					case LONG_DOUBLE : return "fcmp ugt";
+					default : return "imcp sgt";
+				}
+			}
+			return "icmp sgt";
+		}
+
 };
 
 const string LessThanOrEqualOpStr = "<=";
@@ -1849,6 +1917,24 @@ class LessThanOrEqual : public BinaryOperator<Expression, &LessThanOrEqualOpStr,
 			: BinaryOperator(parser, lhs) {}
 		static LessThanOrEqual* create(Parser* parser, Expression* lhs)\
 	   	{return new LessThanOrEqual(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp ule";
+					case UNSIGNED_SHORT_INT : return "icmp ule";
+					case UNSIGNED_INT : return "icmp ule";
+					case UNSIGNED_LONG_INT : return "icmp ule";
+					case UNSIGNED_LONG_LONG_INT : return "icmp ule";
+					case FLOAT : return "fcmp ule";
+					case DOUBLE : return "fcmp ule";
+					case LONG_DOUBLE : return "fcmp ule";
+					default : return "imcp sle";
+				}
+			}
+			return "icmp sle";
+		}
+
 };
 
 const string GreaterThanOrEqualOpStr = ">=";
@@ -1858,6 +1944,23 @@ class GreaterThanOrEqual : public BinaryOperator<Expression, &GreaterThanOrEqual
 			: BinaryOperator(parser, lhs) {}
 		static GreaterThanOrEqual* create(Parser* parser, Expression* lhs)\
 	   	{return new GreaterThanOrEqual(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp uge";
+					case UNSIGNED_SHORT_INT : return "icmp uge";
+					case UNSIGNED_INT : return "icmp uge";
+					case UNSIGNED_LONG_INT : return "icmp uge";
+					case UNSIGNED_LONG_LONG_INT : return "icmp uge";
+					case FLOAT : return "fcmp uge";
+					case DOUBLE : return "fcmp uge";
+					case LONG_DOUBLE : return "fcmp uge";
+					default : return "imcp sge";
+				}
+			}
+			return "icmp sge";
+		}
 };
 
 const string ShiftLeftOpStr = "<<";
@@ -1867,6 +1970,9 @@ class ShiftLeft : public BinaryOperator<Expression, &ShiftLeftOpStr, SHIFT> {
 			: BinaryOperator(parser, lhs) {}
 		static ShiftLeft* create(Parser* parser, Expression* lhs)\
 	   	{return new ShiftLeft(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			return "shl";
+		}
 };
 
 const string ShiftRightOpStr = ">>";
@@ -1876,6 +1982,9 @@ class ShiftRight : public BinaryOperator<Expression, &ShiftRightOpStr, SHIFT> {
 			: BinaryOperator(parser, lhs) {}
 		static ShiftRight* create(Parser* parser, Expression* lhs)\
 	   	{return new ShiftRight(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			return "lshr";
+		}
 };
 
 const string AdditionOpStr = "+";
