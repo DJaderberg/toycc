@@ -530,9 +530,22 @@ class CompoundStatement : public Statement {
 			return ret;
 		}
 		string genLLVM(Scope* s, Consumer<string>* o) {
-			itemList->genLLVM(s, o);
+			Scope* localScope = new Scope(s);
+			localScope->setTemp(s->peekTemp());
+			itemList->genLLVM(localScope, o);
+			s->setTemp(localScope->peekTemp());
+			delete localScope;
 			return "";
 		}
+		string genLLVM(Scope* s, Consumer<string>* o, bool contTemp) {
+			Scope* localScope = new Scope(s);
+			localScope->setTemp(s->peekTemp());
+			itemList->genLLVM(localScope, o);
+			s->setTemp(localScope->peekTemp());
+			delete localScope;
+			return "";
+		}
+
 		//Special version to handle set up of parameters
 			string genLLVM(Scope* s, Consumer<string>* o, ParameterTypeListDirectDeclarator* paramDirDecl);
 			string getLLVMName() const {
@@ -599,7 +612,11 @@ class SelectionStatement : public Statement {
 				Buffer<string>* bufferOpt = new Buffer<string>();
 				//First, evaluate the condition to choose the branch
 				string exprOp = expr->genLLVM(s, o);
-				o->put("\nbr " + expr->getType(s)->getLLVMName() + " " + exprOp);
+				string cmpOp = "%" + to_string(s->getTemp());
+				o->put("\n");
+				o->put(cmpOp + " = icmp eq " + expr->getType(s)->getLLVMName());
+				o->put(" 0, " + exprOp);
+				o->put("\nbr i1 " + cmpOp);
 				o->put(", label %" + to_string(s->getTemp()) + ", label %");
 				string stateStr = "";
 				if (state != NULL) {
@@ -679,10 +696,11 @@ class JumpStatement : public Statement {
 					if (exprType->getLLVMName() != "void") {
 						string retOp = expr->genLLVM(s, o);
 						o->put("\nret " + exprType->getLLVMName() + " " + \
-									retOp + "\n");
+									retOp);
 					}
 				}
 			}
+			s->getTemp();
 			return "";
 		}
 

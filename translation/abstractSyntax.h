@@ -552,7 +552,9 @@ class Scope {
 		bool remove(string str) {
 			return table->remove(str);
 		}
-		unsigned int getTemp() {return ++tempNum;}
+		unsigned int getTemp() {return ++tempNum;} //Returns next temporary
+		unsigned int peekTemp() {return tempNum;} //Returns last used temporary
+		void setTemp(unsigned int val) {tempNum = val;}
 		virtual ~Scope() {
 			if (table != NULL) {delete table;}
 		}
