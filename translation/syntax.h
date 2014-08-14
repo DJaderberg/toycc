@@ -530,11 +530,7 @@ class CompoundStatement : public Statement {
 			return ret;
 		}
 		string genLLVM(Scope* s, Consumer<string>* o) {
-			o->put("{\n");
-			Scope* localScope = new Scope(s);
-			itemList->genLLVM(localScope, o);
-			delete localScope;
-			o->put("}\n");
+			itemList->genLLVM(s, o);
 			return "";
 		}
 		//Special version to handle set up of parameters
@@ -597,11 +593,42 @@ class SelectionStatement : public Statement {
 			if (state != NULL) {delete state;}
 			if (stateOpt != NULL) {delete stateOpt;}
 		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (keyword == "if") {
+				Buffer<string>* buffer = new Buffer<string>();
+				Buffer<string>* bufferOpt = new Buffer<string>();
+				//First, evaluate the condition to choose the branch
+				string exprOp = expr->genLLVM(s, o);
+				o->put("\nbr " + expr->getType(s)->getLLVMName() + " " + exprOp);
+				o->put(", label %" + to_string(s->getTemp()) + ", label %");
+				string stateStr = "";
+				if (state != NULL) {
+					stateStr = state->genLLVM(s, buffer);
+				}
+				string stateOptStr = "";
+				string finalJump = "";
+				string finalTemp = "";
+				if (stateOpt != NULL) {
+					o->put(to_string(s->getTemp()) + "\n");
+					stateOptStr = stateOpt->genLLVM(s, bufferOpt);
+					finalTemp = to_string(s->getTemp());
+					finalJump = "\nbr label %" + finalTemp;
+				} else {
+				}
+				//Okay, that ends the break statement
+				//Time to enter the branches
+				buffer->push_to(o);
+				o->put(finalJump + "\n");
+				bufferOpt->push_to(o);
+				o->put(finalJump);
+			}
+			return "";
+		}
 	private:
 		string keyword;
-		Expression* expr;
-		Statement* state;
-		Statement* stateOpt;
+		Expression* expr = NULL;
+		Statement* state = NULL;
+		Statement* stateOpt = NULL;
 };
 
 class JumpStatement : public Statement {

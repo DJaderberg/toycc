@@ -22,6 +22,29 @@ class StreamConsumer : public Consumer<string> {
 		basic_ostream<char>& filestream;
 };
 
+template<class T>
+class Buffer : public Source<T>, public Consumer<T> {
+	public:
+		Buffer() : list(new std::list<T>()) {}
+		void put(T item) {
+			list->push_back(item);
+		}
+		T get() {
+			T first = list->front();
+			list->pop_front();
+			return first;
+		}
+		bool empty() {return list->empty();}
+		//Empties the buffer into the given consumer
+		void push_to(Consumer<T>* consumer) {
+			while (!empty()) {
+				consumer->put(get());
+			}
+		}
+	private:
+		list<T>* list;
+};
+
 
 enum PriorityEnum {DEFAULT, COMMA, ASSIGNMENT, CONDITIONAL, LOGICAL_OR, \
 	LOGICAL_AND, BITWISE_OR, BITWISE_XOR, BITWISE_AND, EQUALITY, RELATIONAL, \
