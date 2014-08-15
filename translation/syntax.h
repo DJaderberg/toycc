@@ -926,7 +926,7 @@ class ParameterDeclaration : public Node {
 class ParameterList : public NodeList<ParameterDeclaration> {
 	public:
 		ParameterList(ParameterDeclaration* item, ParameterList* list) \
-			: NodeList(item, list) {}
+			: NodeList(item, list, ", ") {}
 		ParameterList(ParameterDeclaration* item) : NodeList(item) {}
 		string getName() {
 			string ret = "";
@@ -938,9 +938,9 @@ class ParameterList : public NodeList<ParameterDeclaration> {
 			NodeList<ParameterDeclaration>* tempList = this;
 			ParameterDeclaration* tempItem = item;
 			while (tempItem != NULL) {
-				Declarator* itemDecl = item->getDeclarator();
+				Declarator* itemDecl = tempItem->getDeclarator();
 				if (itemDecl != NULL) {
-					ret->push_back(item->getDeclarator()->getName());
+					ret->push_back(itemDecl->getName());
 				} else {
 					//TODO: Check that the type is void
 				}
@@ -2454,13 +2454,12 @@ class ArgumentList : public Expression {
 		string genLLVM(Scope* s, Consumer<string>* o) {
 			string ret = "";
 			if (expr != NULL) {
-				return expr->getType(s)->getLLVMName() + " " + expr->genLLVM(s, o);
+				ret += expr->getType(s)->getLLVMName() + " " + expr->genLLVM(s, o);
 			}
 			if (next != NULL) {
-				o->put(", ");
-				return next->genLLVM(s, o);
+				ret += ", " + next->genLLVM(s, o);
 			}
-			return "";
+			return ret;
 		}
 	private:
 		Expression* expr = NULL;

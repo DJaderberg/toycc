@@ -49,7 +49,7 @@ string CompoundStatement :: genLLVM(Scope* s, Consumer<string>* o, ParameterType
 					Scope* localScope = new Scope(s);
 					itemList->genLLVM(localScope, o);
 					delete localScope;
-					o->put("}\n");
+					o->put("\n}\n");
 					return "";
 				}
 		}

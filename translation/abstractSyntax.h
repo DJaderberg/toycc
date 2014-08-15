@@ -83,6 +83,8 @@ class NodeList : public Node {
 		NodeList(T* item) : item(item), next(NULL) {}
 		NodeList(T* item, NodeList* next) : item(item), \
 															  next(next) {}
+		NodeList(T* item, NodeList* next, string delimiter) \
+		: item(item), next(next), delimiter(delimiter) {}	
 		virtual string getName() {
 			string ret = item->getName();
 			if (next != NULL) {
@@ -107,6 +109,7 @@ class NodeList : public Node {
 		bool typeCheck(Scope* s, Type* t);
 		T* item;
 		NodeList* next = NULL; //Optional, might be NULL
+		string delimiter = "\n";
 };
 
 class Expression : public Node {
@@ -600,7 +603,7 @@ string NodeList<T> :: genLLVM(Scope* s, Consumer<string>* o) {
 		item->genLLVM(s, o);
 	}
 	if (next != NULL) {
-		o->put("\n");
+		o->put(this->delimiter);
 		next->genLLVM(s, o);
 	}
 	return "";
