@@ -3,7 +3,8 @@ int square(int a);
 
 int main(void) {
 	int temp;
-	temp = func(4);
+	temp = 4;
+	temp = func(temp);
 	temp = temp + square(8);
 	return temp;
 }
@@ -14,13 +15,14 @@ int func(int a) {
 	b = 3;
 	a = b;
 	c = a << 3;
-	if (a) {
+	if (1) {
+		a = a + a;
 		a = a + a;
 		return b;
-	} else {
-		a = b + b;
+	} /*else {
+		b = b + b;
 		return b*b*b;
-	}
+	}*/
 	double da;
 	double db;
 	double dc;

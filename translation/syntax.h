@@ -410,10 +410,8 @@ class ConstantExpression : public Expression {
 		Type* getType(Scope* s) {return constant->getType(s);}
 		bool typeCheck(Scope* s) {return constant->typeCheck(s);}
 		string genLLVM(Scope* s, Consumer<string>* o) {
-			//string retOp = "%" + to_string(s->getTemp());
-			//o->put(retOp + " = ");
 			if (constant != NULL) {
-				constant->genLLVM(s, o);
+				return constant->getName();
 			}
 			return "";
 		}
@@ -631,13 +629,18 @@ class SelectionStatement : public Statement {
 					finalTemp = to_string(s->getTemp());
 					finalJump = "\nbr label %" + finalTemp;
 				} else {
+					finalTemp = to_string(s->getTemp());
+					o->put(finalTemp + "\n");
+					finalJump = "\nbr label %" + finalTemp;
 				}
 				//Okay, that ends the break statement
 				//Time to enter the branches
 				buffer->push_to(o);
 				o->put(finalJump + "\n");
-				bufferOpt->push_to(o);
-				o->put(finalJump);
+				if (stateOpt != NULL) {
+					bufferOpt->push_to(o);
+					o->put(finalJump);
+				}
 			}
 			return "";
 		}
@@ -2449,10 +2452,9 @@ class ArgumentList : public Expression {
 			return ret;
 		}
 		string genLLVM(Scope* s, Consumer<string>* o) {
+			string ret = "";
 			if (expr != NULL) {
-				Type* type = expr->getType(s);
-				o->put(type->getLLVMName() + " ");
-				return expr->genLLVM(s, o);
+				return expr->getType(s)->getLLVMName() + " " + expr->genLLVM(s, o);
 			}
 			if (next != NULL) {
 				o->put(", ");
@@ -2496,19 +2498,22 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 			}
 		}
 		string genLLVM(Scope* s, Consumer<string>* o) {
-			string retOp = "%" + to_string(s->getTemp());
-			o->put(retOp + " = ");
-			o->put("call ");
-			Symbol* symbol = s->find(lhs->getName());
-			if (symbol != NULL) {
-				Type* symbolType = symbol->getType();
-				if (symbolType != NULL) {
-					o->put(symbolType->getLLVMName());
+			string retOp = "";
+			Symbol* returnSymbol = s->find(lhs->getName());
+			string arguments = rhs->genLLVM(s, o);
+			o->put("\n");
+			if (returnSymbol != NULL) {
+				retOp = "%" + to_string(s->getTemp());
+				o->put(retOp + " = ");
+				o->put("call ");
+				Type* returnType = returnSymbol->getType();
+				if (returnType != NULL) {
+					o->put(returnType->getLLVMName());
 				} else {
 					o->put("void");
 				}
 				o->put(" @" + lhs->getName() + "(");
-				rhs->genLLVM(s, o);
+				o->put(arguments);
 				o->put(")");
 			} else {
 				string err = "Unknown return type of function";
