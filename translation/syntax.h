@@ -736,24 +736,6 @@ class LabeledStatement : public Statement {
 class IterationStatement : public Statement {
 };
 
-class WhileStatement : public IterationStatement {
-	public:
-		WhileStatement(Expression* expr, Statement* state) : expr(expr), \
-															 state(state) {}
-		string getName() {
-			string ret = "while (";
-			if (expr != NULL) {ret += expr->getName();}
-			ret += ")";
-			if (state != NULL) {ret += state->getName();}
-			return ret;
-		}
-		string genLLVM(Scope* s, Consumer<string>* o) {
-		}
-	private:
-		Expression* expr = NULL;
-		Statement* state = NULL;
-};
-
 class DoWhileStatement : public IterationStatement {
 	public:
 		DoWhileStatement(Expression* expr, Statement* state) : expr(expr), \
@@ -785,7 +767,56 @@ class DoWhileStatement : public IterationStatement {
 			o->put(", label %" + to_string(jumpBackTo));
 			return "";
 		}
+		virtual ~DoWhileStatement() {
+			if (expr != NULL) {delete expr;}
+			if (state != NULL) {delete state;}
+		}
 	private:
+		Expression* expr = NULL;
+		Statement* state = NULL;
+};
+
+class WhileStatement : public IterationStatement {
+	public:
+		WhileStatement(Expression* expr, Statement* state) \
+			: expr(expr),  state(state) {
+			doWhile = new DoWhileStatement(expr, state);
+			}
+		string getName() {
+			string ret = "while (";
+			if (expr != NULL) {ret += expr->getName();}
+			ret += ")";
+			if (state != NULL) {ret += state->getName();}
+			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			//Create dummy do-while statement and use that to create the bulk
+			//of the code, only creating the initial branch here
+			DoWhileStatement* doWhile = new DoWhileStatement(expr, state);
+			Buffer<string>* buffer = new Buffer<string>();
+			string exprEval = "";
+			if (expr != NULL) {
+				exprEval = expr->genLLVM(s, o);
+			}
+			string icmpTemp = "%" + to_string(s->getTemp());
+			o->put("\n");
+			o->put(icmpTemp + " = icmp ne "+ expr->getType(s)->getLLVMName());
+			o->put(" " + exprEval + ", 0");
+			o->put("\nbr i1 " + icmpTemp + ", label %"+ to_string(s->getTemp()));
+			doWhile->genLLVM(s, buffer);
+			o->put(", label %" + to_string(s->peekTemp()));
+			o->put("\n");
+			buffer->push_to(o);
+			delete buffer;
+			return "";
+		}
+		virtual ~WhileStatement() {
+			if (doWhile != NULL) {delete doWhile;}
+			if (expr != NULL) {delete expr;}
+			if (state != NULL) {delete state;}
+		}
+	private:
+		DoWhileStatement* doWhile = NULL;
 		Expression* expr = NULL;
 		Statement* state = NULL;
 };
@@ -2672,18 +2703,14 @@ string BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<str
 	//If lhs is a variable name, use that as an operand.
 	//Otherwise, compute the result and store it in a temporary
 	//Also checks for constants instead of using temporaries
-	/*if ((downcast = dynamic_cast<IdentifierExpression*>(lhs))) {
-		op1 += downcast->getName();
-	} else*/ if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
-		op1 = downcast->getName();
+	if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
+		op1 = downcastConst->getName();
 	} else {
 		op1 = lhs->genLLVM(s, o);
 		o->put("\n");
 	}
 	//Same for rhs
-	/*if ((downcast = dynamic_cast<IdentifierExpression*>(rhs))) {
-		op2 += downcast->getName();
-	} else */if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
+	if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
 		op2 = downcastConst->getName();
 	} else {
 		op2 = rhs->genLLVM(s, o);
