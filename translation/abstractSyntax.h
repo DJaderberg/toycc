@@ -235,7 +235,7 @@ class BasicType : public Type {
 		}
 		string getLLVMName() const {
 			switch(basicType) {
-				case _BOOL : return "i8";
+				case _BOOL : return "i1";
 				case CHAR : return "i8";
 				case SIGNED_CHAR : return "i8";
 				case UNSIGNED_CHAR : return "i8";

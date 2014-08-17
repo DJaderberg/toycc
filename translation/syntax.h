@@ -733,10 +733,6 @@ class LabeledStatement : public Statement {
 		Statement* state = NULL;
 };
 
-class WhileStatement;
-class DoWhileStatement;
-class ForStatement;
-
 class IterationStatement : public Statement {
 };
 
@@ -750,6 +746,8 @@ class WhileStatement : public IterationStatement {
 			ret += ")";
 			if (state != NULL) {ret += state->getName();}
 			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
 		}
 	private:
 		Expression* expr = NULL;
@@ -767,6 +765,25 @@ class DoWhileStatement : public IterationStatement {
 			if (expr != NULL) {ret += expr->getName();}
 			ret += ")";
 			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			unsigned int jumpBackTo = s->getTemp();
+			o->put("br label %" + to_string(jumpBackTo) + "\n");
+			if (state != NULL) {
+				state->genLLVM(s, o);
+			}
+			o->put("\n");
+			string exprEval = "";
+			if (expr != NULL) {
+				exprEval = expr->genLLVM(s, o);
+			}
+			string icmpTemp = "%" + to_string(s->getTemp());
+			o->put("\n");
+			o->put(icmpTemp + " = icmp eq "+ expr->getType(s)->getLLVMName());
+			o->put(" " + exprEval + ", 0");
+			o->put("\nbr i1 " + icmpTemp + ", label %"+ to_string(s->getTemp()));
+			o->put(", label %" + to_string(jumpBackTo));
+			return "";
 		}
 	private:
 		Expression* expr = NULL;
@@ -1877,10 +1894,13 @@ class Equality : public BinaryOperator<Expression, &EqualityOpStr, EQUALITY> {
 					case FLOAT : return "fcmp ueq";
 					case DOUBLE : return "fcmp ueq";
 					case LONG_DOUBLE : return "fcmp ueq";
-					default : return "imcp eq";
+					default : return "icmp eq";
 				}
 			}
 			return "icmp eq";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
 		}
 };
 
@@ -1898,10 +1918,13 @@ class NonEquality : public BinaryOperator<Expression, &NonEqualityOpStr, EQUALIT
 					case FLOAT : return "fcmp une";
 					case DOUBLE : return "fcmp une";
 					case LONG_DOUBLE : return "fcmp une";
-					default : return "imcp ne";
+					default : return "icmp ne";
 				}
 			}
 			return "icmp ne";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
 		}
 };
 
@@ -1924,10 +1947,13 @@ class LessThan : public BinaryOperator<Expression, &LessThanOpStr, RELATIONAL> {
 					case FLOAT : return "fcmp ult";
 					case DOUBLE : return "fcmp ult";
 					case LONG_DOUBLE : return "fcmp ult";
-					default : return "imcp slt";
+					default : return "icmp slt";
 				}
 			}
 			return "icmp slt";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
 		}
 };
 
@@ -1950,12 +1976,14 @@ class GreaterThan : public BinaryOperator<Expression, &GreaterThanOpStr, RELATIO
 					case FLOAT : return "fcmp ugt";
 					case DOUBLE : return "fcmp ugt";
 					case LONG_DOUBLE : return "fcmp ugt";
-					default : return "imcp sgt";
+					default : return "icmp sgt";
 				}
 			}
 			return "icmp sgt";
 		}
-
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string LessThanOrEqualOpStr = "<=";
@@ -1977,12 +2005,14 @@ class LessThanOrEqual : public BinaryOperator<Expression, &LessThanOrEqualOpStr,
 					case FLOAT : return "fcmp ule";
 					case DOUBLE : return "fcmp ule";
 					case LONG_DOUBLE : return "fcmp ule";
-					default : return "imcp sle";
+					default : return "icmp sle";
 				}
 			}
 			return "icmp sle";
 		}
-
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string GreaterThanOrEqualOpStr = ">=";
@@ -2004,10 +2034,13 @@ class GreaterThanOrEqual : public BinaryOperator<Expression, &GreaterThanOrEqual
 					case FLOAT : return "fcmp uge";
 					case DOUBLE : return "fcmp uge";
 					case LONG_DOUBLE : return "fcmp uge";
-					default : return "imcp sge";
+					default : return "icmp sge";
 				}
 			}
 			return "icmp sge";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
 		}
 };
 
