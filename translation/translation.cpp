@@ -6,9 +6,10 @@ int main(int argc, char *argv[]) {
 	if (argc > 1) {
 		filename = argv[1];
 	} else {
-		filename = "/Users/David/toycc/test/include.c"; //Tokenizing
-		filename = "/Users/David/toycc/test/expressions.c"; //Parsing
-		filename = "/Users/David/toycc/test/externaldeclarations.c"; //More parsing
+		filename = "~/toycc/test/include.c"; //Tokenizing
+		filename = "~/toycc/test/expressions.c"; //Parsing
+		filename = "~/toycc/test/externaldeclarations.c"; //More parsing
+		filename = "~/toycc/test/ir.c"; //Code generation
 	}
 	try {
 	return translate(filename);
@@ -20,12 +21,21 @@ int main(int argc, char *argv[]) {
 	} catch (runtime_error& error) {
 		cout << "Error: " << error.what() << "\n";
 		return 1;
+	} catch (TypeError* err) {
+		cout << "Type error: " << err->what() << '\n';
 	} catch (...) {
 		cout << "Unknown exception" << '\n';
 	}
 }
 
 int translate(string filename) {
+	Type* testInt = new BasicType(INT);
+	Type* testDouble = new BasicType(DOUBLE);
+	TypeList* testTypeListLast = new TypeList(testDouble);
+	TypeList* testTypeListFirst = new TypeList(testInt, testTypeListLast);
+	Type* testType = new StructType(testTypeListFirst);
+	//cout << "Size of struct: " << testType->getSize() << '\n';
+	
 	ifstream filestream = ifstream(filename);
 	stringstream stream1to2 = stringstream(std::ios_base::in
                               | std::ios_base::out
@@ -60,14 +70,23 @@ int translate(string filename) {
 		ptr = NULL;
 		if (bufParserSource->empty()) {break;}
 		//Statement* ptr = parser->parseStatement();
-		ExternalDeclaration* ptr = parser->parseExternalDeclaration();
+		TranslationUnit* ptr = parser->parseTranslationUnit();
+		
 		if (ptr == NULL) {
 			cout << "Could not parse expression" << '\n';
 			return 0;
 		} else {
-			cout << ptr->getName() << '\n';
+			Scope* scope = new Scope();
+			//cout << "Type check: " << ptr->typeCheck(scope) << '\n';
+			//cout << ptr->getName() << '\n';
+			filename.pop_back(); //Remove final char from string (c in *.c)
+			string ofilename = filename + "ll"; //Assume *.c -> *.ll
+			ofstream filestream = ofstream(ofilename);
+			Consumer<string>* llvmOutput = new StreamConsumer(filestream);
+			llvmOutput->put("target triple = \"x86_64-apple-macosx10.9.0\"\n");
+			ptr->genLLVM(scope, llvmOutput);
+			//cout << ptr->getType(scope)->getName() << '\n';
 		}
-		parser->getSource()->clearUsed();
 	}
 		
 	//Tokenization printing code

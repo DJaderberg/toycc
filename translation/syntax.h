@@ -1,4 +1,4 @@
-#include "source.h"
+//#include "source.h"
 #include "abstractSyntax.h"
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
@@ -12,6 +12,23 @@ class PrefixOperator : public Operator {
 			ret += Operator::getName();
 			if (expr != NULL) {ret += expr->getName();}
 			return ret;
+		}
+		Type* getType(Scope* s) {
+			if (opStr == "&") {
+				return new PointerType(expr->getType(s));
+			} else if (opStr == "*") {
+				//Magic wand of dereference, downcast expr->getType() to a 
+				//PointerType and return pointeeType
+				if (PointerType* downcast = \
+						dynamic_cast<PointerType*>(expr->getType(s))) {
+					return downcast->getPointeeType();
+				} else {
+					string err = "Dereference (prefix operator '*' requires a "\
+								  "pointer type";
+					throw new TypeError(err);
+				}
+			}
+			return expr->getType(s);
 		}
 		void parse(Parser* parser);
 	private:
@@ -78,6 +95,24 @@ class BinaryOperator : public InfixOperator {
 			}
 			return ret;
 		}
+		virtual bool typeCheck(Scope* s) {
+			Type* lhsT = lhs->getType(s);
+			Type* rhsT = rhs->getType(s);
+			if (lhsT == NULL || rhsT == NULL) {
+				return false;
+			}
+			if (*lhsT != *rhsT) {
+				string err = "Mismatched types '" + lhsT->getName() + "' and '" + \
+							  rhsT->getName() + "' in binary operator " + \
+							  this->getName();
+				throw new TypeError(err);
+			}
+			return rhs->typeCheck(s) && lhs->typeCheck(s);
+		}
+		virtual Type* getType(Scope* s) {
+			return lhs->getType(s);
+		}
+		virtual string genLLVM(Scope* s, Consumer<string>* o);
 		void parse(Parser* parser);
 	protected:
 		Op* rhs = NULL; //The right hand side 
@@ -174,6 +209,7 @@ class Enumerator;
 class EnumeratorList;
 class FunctionDefinition;
 class ParameterTypeList;
+class ParameterTypeListDirectDeclarator;
 class ParameterList;
 class ParameterDeclaration;
 class TypeQualifierList;
@@ -182,6 +218,8 @@ class StructDeclaration;
 class SpecifierQualifierList;
 class StructDeclaratorList;
 class StructDeclarator;
+class ArgumentList;
+
 
 //Constructs an AST from the input Tokens
 class Parser {
@@ -236,6 +274,7 @@ class Parser {
 		SpecifierQualifierList* parseSpecifierQualifierList();
 		StructDeclaratorList* parseStructDeclaratorList();
 		StructDeclarator* parseStructDeclarator();
+		ArgumentList* parseArgumentList();
 		map<string, string> mStorageClassSpecifier;
 		map<string, string> mTypeSpecifier;
 		map<string, string> mTypeQualifier;
@@ -258,7 +297,19 @@ class Identifier : public Node {
 		Identifier(Token token) : token(token) {}
 		string getName() {return token.getName();}
 		virtual ~Identifier() {}
-	private:
+		bool typeCheck(Scope* s) {return true;}
+		Type* getType(Scope* s) {
+			auto tempSearch = s->find(this->getName());
+			Type* search = NULL;
+			if (tempSearch != NULL) {
+				search = tempSearch->getType();
+			}
+			if (search == NULL) {
+				return new NoType();
+			} 
+			return search;
+		}
+	protected:
 		Token token;
 };
 
@@ -285,6 +336,13 @@ class Constant : public Identifier {
 	public:
 		Constant(Token token) : Identifier(token) {}
 		virtual ~Constant() {}
+		Type* getType(Scope* s) {return this->getType(token.getName());}
+		static Type* getType(string str); //ints and doubles only
+		bool typeCheck(Scope* s) {return true;}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			o->put(this->getName());
+			return "";
+		}
 };
 
 class EnumerationConstant : public Constant {
@@ -310,6 +368,15 @@ class IdentifierExpression : public Expression {
 		}
 		string getName() {return identifier->getName();}
 		void parse(Parser* parser) {}
+		bool typeCheck(Scope* s) {return identifier->typeCheck(s);}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			string retOp = "%" + to_string(s->getTemp());
+			o->put(retOp + " = ");
+			o->put("load "  + this->getType(s)->getLLVMName() + "* %" + \
+					identifier->getName());
+			return retOp;
+		}
+		Type* getType(Scope* s) {return identifier->getType(s);}
 	private:
 		Identifier* identifier = NULL;
 };
@@ -340,6 +407,14 @@ class ConstantExpression : public Expression {
 		}
 		string getName() {return constant->getName();}
 		void parse(Parser* parser) {}
+		Type* getType(Scope* s) {return constant->getType(s);}
+		bool typeCheck(Scope* s) {return constant->typeCheck(s);}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (constant != NULL) {
+				return constant->getName();
+			}
+			return "";
+		}
 	private:
 		Constant* constant = NULL;
 };
@@ -370,17 +445,18 @@ class ExternalDeclaration : public Node {
 		ExternalDeclaration(FunctionDefinition* funcDef) : funcDef(funcDef) {}
 		ExternalDeclaration(Declaration* decl) : decl(decl) {}
 		string getName();
+		bool typeCheck(Scope* s);
+		string genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		FunctionDefinition* funcDef = NULL;
 		Declaration* decl = NULL;
 };
 
-class TranslationUnit : public Node {
+class TranslationUnit : public NodeList<ExternalDeclaration> {
 	public:
-		TranslationUnit(list<ExternalDeclaration*>& list) : list(list) {}
-		list<ExternalDeclaration*>& getList() {return this->list;}
-	private:
-		list<ExternalDeclaration*>& list;
+		TranslationUnit(ExternalDeclaration* decl, TranslationUnit* next) : \
+			NodeList(decl, next) {}
+		TranslationUnit(ExternalDeclaration* decl) : NodeList(decl) {}
 };
 
 class Statement : public Node {
@@ -395,6 +471,9 @@ class BlockItem : public Node {
 		BlockItem(Statement* state) : state(state) {}
 		virtual ~BlockItem();
 		string getName();
+		bool typeCheck(Scope* s); 
+		Type* getType(Scope* s);
+		string genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		Declaration* decl = NULL;
 		Statement* state = NULL;
@@ -409,6 +488,14 @@ class BlockItemList : public NodeList<BlockItem> {
 			if (item != NULL) {ret += item->getName();}
 			if (next != NULL) {ret += "\n" + next->getName();}
 			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (item != NULL) {item->genLLVM(s, o);}
+			if (next != NULL) {
+				o->put("\n");
+				next->genLLVM(s, o);
+			}
+			return "";
 		}
 };
 
@@ -431,6 +518,40 @@ class CompoundStatement : public Statement {
 			ret += "\n}";
 			return ret;
 		}
+		virtual Type* getType(Scope* s) {
+			return new NoType();
+		}
+		virtual bool typeCheck(Scope* s) {
+			Scope* localScope = new Scope(s);
+			bool ret = itemList->typeCheck(localScope);
+			delete localScope;
+			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			Scope* localScope = new Scope(s);
+			localScope->setTemp(s->peekTemp());
+			itemList->genLLVM(localScope, o);
+			s->setTemp(localScope->peekTemp());
+			delete localScope;
+			return "";
+		}
+		string genLLVM(Scope* s, Consumer<string>* o, bool contTemp) {
+			Scope* localScope = new Scope(s);
+			localScope->setTemp(s->peekTemp());
+			itemList->genLLVM(localScope, o);
+			s->setTemp(localScope->peekTemp());
+			delete localScope;
+			return "";
+		}
+
+		//Special version to handle set up of parameters
+			string genLLVM(Scope* s, Consumer<string>* o, ParameterTypeListDirectDeclarator* paramDirDecl);
+			string getLLVMName() const {
+			string ret = "{\n";
+			if (itemList != NULL) {ret += itemList->getLLVMName();}
+			ret += "}\n";
+			return ret;
+		}
 	private:
 		BlockItemList* itemList; //Optional, may be NULL
 
@@ -445,6 +566,18 @@ class ExpressionStatement : public Statement {
 			if (expression != NULL) {ret += expression->getName();}
 			ret += ";";
 			return ret;
+		}
+		virtual Type* getType(Scope* s) {
+			return expression->getType(s);
+		}
+		virtual bool typeCheck(Scope* s) {
+			return expression->typeCheck(s);
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (expression != NULL) {
+				return expression->genLLVM(s, o);
+			}
+			return "";
 		}
 	private:
 		Expression* expression = NULL; //Optional
@@ -471,11 +604,51 @@ class SelectionStatement : public Statement {
 			if (state != NULL) {delete state;}
 			if (stateOpt != NULL) {delete stateOpt;}
 		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (keyword == "if") {
+				Buffer<string>* buffer = new Buffer<string>();
+				Buffer<string>* bufferOpt = new Buffer<string>();
+				//First, evaluate the condition to choose the branch
+				string exprOp = expr->genLLVM(s, o);
+				string cmpOp = "%" + to_string(s->getTemp());
+				o->put("\n");
+				o->put(cmpOp + " = icmp eq " + expr->getType(s)->getLLVMName());
+				o->put(" 0, " + exprOp);
+				o->put("\nbr i1 " + cmpOp);
+				o->put(", label %" + to_string(s->getTemp()) + ", label %");
+				string stateStr = "";
+				if (state != NULL) {
+					stateStr = state->genLLVM(s, buffer);
+				}
+				string stateOptStr = "";
+				string finalJump = "";
+				string finalTemp = "";
+				if (stateOpt != NULL) {
+					o->put(to_string(s->getTemp()) + "\n");
+					stateOptStr = stateOpt->genLLVM(s, bufferOpt);
+					finalTemp = to_string(s->getTemp());
+					finalJump = "\nbr label %" + finalTemp;
+				} else {
+					finalTemp = to_string(s->getTemp());
+					o->put(finalTemp + "\n");
+					finalJump = "\nbr label %" + finalTemp;
+				}
+				//Okay, that ends the break statement
+				//Time to enter the branches
+				buffer->push_to(o);
+				o->put(finalJump + "\n");
+				if (stateOpt != NULL) {
+					bufferOpt->push_to(o);
+					o->put(finalJump);
+				}
+			}
+			return "";
+		}
 	private:
 		string keyword;
-		Expression* expr;
-		Statement* state;
-		Statement* stateOpt;
+		Expression* expr = NULL;
+		Statement* state = NULL;
+		Statement* stateOpt = NULL;
 };
 
 class JumpStatement : public Statement {
@@ -503,6 +676,37 @@ class JumpStatement : public Statement {
 			if (id != NULL) {delete id;}
 			if (expr != NULL) {delete expr;}
 		}
+		Type* getType(Scope* s) {
+			if (expr != NULL) {return expr->getType(s);}
+			return new NoType();
+		}
+		bool typeCheck(Scope* s) {
+			if (expr == NULL) {
+				return true;
+			}
+			if (keyword == "return") {
+				Type* search = s->find("return")->getType();
+				return *search == *expr->getType(s);
+			} else {
+				return true;
+			}
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			//TODO: Implement all keywords
+			if (keyword == "return") {
+				if (expr != NULL) {
+					Type* exprType = expr->getType(s);
+					if (exprType->getLLVMName() != "void") {
+						string retOp = expr->genLLVM(s, o);
+						o->put("\nret " + exprType->getLLVMName() + " " + \
+									retOp);
+					}
+				}
+			}
+			s->getTemp();
+			return "";
+		}
+
 	private:
 		string keyword;
 		Identifier* id = NULL;
@@ -529,27 +733,7 @@ class LabeledStatement : public Statement {
 		Statement* state = NULL;
 };
 
-class WhileStatement;
-class DoWhileStatement;
-class ForStatement;
-
 class IterationStatement : public Statement {
-};
-
-class WhileStatement : public IterationStatement {
-	public:
-		WhileStatement(Expression* expr, Statement* state) : expr(expr), \
-															 state(state) {}
-		string getName() {
-			string ret = "while (";
-			if (expr != NULL) {ret += expr->getName();}
-			ret += ")";
-			if (state != NULL) {ret += state->getName();}
-			return ret;
-		}
-	private:
-		Expression* expr = NULL;
-		Statement* state = NULL;
 };
 
 class DoWhileStatement : public IterationStatement {
@@ -564,7 +748,75 @@ class DoWhileStatement : public IterationStatement {
 			ret += ")";
 			return ret;
 		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			unsigned int jumpBackTo = s->getTemp();
+			o->put("br label %" + to_string(jumpBackTo) + "\n");
+			if (state != NULL) {
+				state->genLLVM(s, o);
+			}
+			o->put("\n");
+			string exprEval = "";
+			if (expr != NULL) {
+				exprEval = expr->genLLVM(s, o);
+			}
+			string icmpTemp = "%" + to_string(s->getTemp());
+			o->put("\n");
+			o->put(icmpTemp + " = icmp eq "+ expr->getType(s)->getLLVMName());
+			o->put(" " + exprEval + ", 0");
+			o->put("\nbr i1 " + icmpTemp + ", label %"+ to_string(s->getTemp()));
+			o->put(", label %" + to_string(jumpBackTo));
+			return "";
+		}
+		virtual ~DoWhileStatement() {
+			if (expr != NULL) {delete expr;}
+			if (state != NULL) {delete state;}
+		}
 	private:
+		Expression* expr = NULL;
+		Statement* state = NULL;
+};
+
+class WhileStatement : public IterationStatement {
+	public:
+		WhileStatement(Expression* expr, Statement* state) \
+			: expr(expr),  state(state) {
+			doWhile = new DoWhileStatement(expr, state);
+			}
+		string getName() {
+			string ret = "while (";
+			if (expr != NULL) {ret += expr->getName();}
+			ret += ")";
+			if (state != NULL) {ret += state->getName();}
+			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			//Create dummy do-while statement and use that to create the bulk
+			//of the code, only creating the initial branch here
+			DoWhileStatement* doWhile = new DoWhileStatement(expr, state);
+			Buffer<string>* buffer = new Buffer<string>();
+			string exprEval = "";
+			if (expr != NULL) {
+				exprEval = expr->genLLVM(s, o);
+			}
+			string icmpTemp = "%" + to_string(s->getTemp());
+			o->put("\n");
+			o->put(icmpTemp + " = icmp ne "+ expr->getType(s)->getLLVMName());
+			o->put(" " + exprEval + ", 0");
+			o->put("\nbr i1 " + icmpTemp + ", label %"+ to_string(s->getTemp()));
+			doWhile->genLLVM(s, buffer);
+			o->put(", label %" + to_string(s->peekTemp()));
+			o->put("\n");
+			buffer->push_to(o);
+			delete buffer;
+			return "";
+		}
+		virtual ~WhileStatement() {
+			if (doWhile != NULL) {delete doWhile;}
+			if (expr != NULL) {delete expr;}
+			if (state != NULL) {delete state;}
+		}
+	private:
+		DoWhileStatement* doWhile = NULL;
 		Expression* expr = NULL;
 		Statement* state = NULL;
 };
@@ -600,18 +852,21 @@ class Pointer : public Node {
 			typeQualList(typeQualList), next(NULL) {}
 		string getName();
 		virtual ~Pointer();
+		Pointer* getNext() {return next;}
 	private:
 		TypeQualifierList* typeQualList = NULL;
 		Pointer* next = NULL;
 };
 
 class Declarator : public Node {
-	//TODO: Implement the optional Pointer here
 	public:
 		Declarator(DirectDeclarator* dirDecl) : dirDecl(dirDecl), pointer(NULL) {}
 		Declarator(DirectDeclarator* dirDecl, Pointer* pointer) : dirDecl(dirDecl), pointer(pointer) {}
 		virtual ~Declarator(); 
 		string getName();
+		Pointer* getPointer() {return pointer;}
+		DirectDeclarator* getDirectDeclarator() {return dirDecl;}
+		bool insert(Scope* s, Type* t);
 	private:
 		DirectDeclarator* dirDecl = NULL;
 		Pointer* pointer = NULL;
@@ -649,6 +904,8 @@ class DirectDeclarator : public Node {
 			if (next != NULL) {ret = next->getName();}
 			return ret;
 		}
+		virtual bool insert(Scope* s, Type* t) {return false;}
+		DirectDeclarator* getNext() {return next;}
 	protected:
 		DirectDeclarator* next = NULL;
 };
@@ -668,6 +925,15 @@ class IdentifierDirectDeclarator : public DirectDeclarator {
 		virtual ~IdentifierDirectDeclarator() {
 			if (id != NULL) {delete id;}
 		}
+		bool insert(Scope* s, Type* t) {
+			if (id != NULL) {
+				s->insert(id->getName(), t);
+				return true;
+			} else {
+				return false;
+			}
+		}
+		Identifier* getIdentifier() {return id;}
 	private:
 		Identifier* id = NULL;
 };
@@ -697,6 +963,9 @@ class ParameterDeclaration : public Node {
 		ParameterDeclaration(DeclarationSpecifierList* declSpecList, Declarator* decl) : declSpecList(declSpecList), decl(decl) {}
 		virtual ~ParameterDeclaration();
 		string getName();
+		Type* getType(Scope* s);
+		Declarator* getDeclarator() {return decl;}
+		string genLLVM(Scope* s, Consumer<string>* o);
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
@@ -705,13 +974,46 @@ class ParameterDeclaration : public Node {
 class ParameterList : public NodeList<ParameterDeclaration> {
 	public:
 		ParameterList(ParameterDeclaration* item, ParameterList* list) \
-			: NodeList(item, list) {}
+			: NodeList(item, list, ", ") {}
 		ParameterList(ParameterDeclaration* item) : NodeList(item) {}
 		string getName() {
 			string ret = "";
 			if (item != NULL) {ret += item->getName();}
 			if (next != NULL) {ret += ", " + next->getName();}
 			return ret;
+		}
+		void getNames(Scope* s, list<string>* ret) {
+			NodeList<ParameterDeclaration>* tempList = this;
+			ParameterDeclaration* tempItem = item;
+			while (tempItem != NULL) {
+				Declarator* itemDecl = tempItem->getDeclarator();
+				if (itemDecl != NULL) {
+					ret->push_back(itemDecl->getName());
+				} else {
+					//TODO: Check that the type is void
+				}
+				tempList = tempList->getNext();
+				if (tempList != NULL) {
+					tempItem = tempList->getItem();
+				} else {
+						tempItem = NULL;
+					}
+			}
+		}
+		//Inserts each element into the scope s with the correct type
+		/* Expects that typeList and nameList contain the same number of 
+		 * elements.
+		 */
+		static bool enterTypes(Scope* s, TypeList* typeList, list<string>* nameList) {
+			if (typeList == NULL && nameList->empty()) {
+				return true;
+			} else if (typeList == NULL || nameList->empty()) {
+				return false;
+			} else {
+				bool temp = s->insert(nameList->front(), typeList->getItem());
+				nameList->pop_front();
+				return temp && enterTypes(s, typeList->getNext(), nameList);
+			}
 		}
 };
 
@@ -729,6 +1031,15 @@ class ParameterTypeList : public Node {
 			if (hasTrailing) {ret += ", ...";}
 			return ret;
 		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (paramList != NULL) {paramList->genLLVM(s, o);}
+			if (hasTrailing) {o->put(", ...");}
+			return "";
+		}
+		TypeList* getTypes(Scope* s) {return paramList->getTypes(s);}
+		void getNames(Scope* s, list<string>* ret) {
+			paramList->getNames(s, ret);
+		}
 	private:
 		ParameterList* paramList = NULL;
 		bool hasTrailing = false; //If list ends with ', ...'
@@ -739,6 +1050,11 @@ class ParameterTypeListDirectDeclarator : public DirectDeclarator {
 		ParameterTypeListDirectDeclarator(ParameterTypeList* params) : params(params) {}
 		virtual ~ParameterTypeListDirectDeclarator();
 		string getName();
+		ParameterTypeList* getParams() {return params;}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			if (params != NULL) {return params->genLLVM(s, o);}
+			return "";
+		}
 	private:
 		ParameterTypeList* params = NULL;
 };
@@ -795,6 +1111,11 @@ class InitDeclarator : public Node {
 			if (init != NULL) {ret += " = " + init->getName();}
 			return ret;
 		}
+		bool insert(Scope* s, Type* type) {
+			//TODO: Initialize variable as well
+			return dec->insert(s, type);
+		}
+		Declarator* getDeclarator() {return dec;}
 	private:
 		Declarator* dec;
 		Initializer* init;
@@ -838,17 +1159,27 @@ class DeclarationSpecifier : public Node {
 
 class DeclarationSpecifierList : public NodeList<DeclarationSpecifier> {
 	public:
-		DeclarationSpecifierList(DeclarationSpecifier* item, DeclarationSpecifierList* next) : NodeList(item, next) {}
+		DeclarationSpecifierList(DeclarationSpecifier* item, DeclarationSpecifierList* next) : NodeList(item, next) {
+			if (mBasicTypes.empty()) {
+				initBasicTypesMap();
+			}
+		}
 		string getName() {
 			string ret = "";
 			if (item != NULL) {ret += item->getName() + " ";}
 			if (next != NULL) {ret += next->getName();}
 			return ret;
 		}
+		//TODO: Implement getType here, which will be the meat of insertion of 
+		//new variables
+		Type* getType(Scope* s); //Currently supports basic types
+		static map<string, BasicTypeEnum> initBasicTypesMap();
+	private:
+		static map<string, BasicTypeEnum> mBasicTypes;
 };
 
 class Declaration : public Node {
-	//TODO: Implement Declaration specifiers and static_assert declarations
+	//TODO: Implement static_assert declarations
 	public:
 		Declaration() : initList(NULL) {}
 		Declaration(InitDeclaratorList* initList) : initList(initList) {}
@@ -862,7 +1193,70 @@ class Declaration : public Node {
 			ret += ";";
 			return ret;
 		}
+		Type* getType(Scope* s) {
+			return declList->getType(s);
+		}
+		bool typeCheck(Scope* s) {
+			return this->add(s);
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			this->add(s);
+			Declarator* decl = initList->getItem()->getDeclarator();
+			DirectDeclarator* dirDecl = decl->getDirectDeclarator();
+			DirectDeclarator* nextDirDecl = dirDecl->getNext();
+			if (nextDirDecl == NULL) {
+				//Could be an IdentifierDirectDeclarator or '(declarator)'
+				if (IdentifierDirectDeclarator* idDirDecl = dynamic_cast<IdentifierDirectDeclarator*>(dirDecl)) {
+					o->put("%" + idDirDecl->getIdentifier()->getName() + \
+							" = alloca " + declList->getType(s)->getLLVMName());
+				}
+			} /*else if (ParameterTypeListDirectDeclarator* paramDirDecl =\
+					dynamic_cast<ParameterTypeListDirectDeclarator*>\
+					(nextDirDecl)) {
+				//It's a function declaration!
+				//Has to be possible to downcast dirDecl to IdentifierDirDecl
+				if (IdentifierDirectDeclarator* idDirDecl = \
+						dynamic_cast<IdentifierDirectDeclarator*>(dirDecl)) {
+					o->put("declare " + declList->getType(s)->getLLVMName());
+					o->put(" @" + idDirDecl->getIdentifier()->getName());
+				} else {
+					string err = "Expected identifier to name function";
+					throw new TypeError(err);
+				}
+				o->put("(");
+				paramDirDecl->genLLVM(s, o);
+				o->put(")");
+			}*/
+			return "";
+		}
 	private:
+		//Add all variables in this declaration to the scope
+		bool add(Scope* s) {
+			if (declList == NULL || initList == NULL) {
+				return false;
+			} else {
+				//Make sure we are not redeclaraing anything. 
+				//initList->typeCheck(s) will do this for us
+				if (!initList->typeCheck(s)) {
+					return false;
+				} else {
+					//Enter all declarations into the current scope
+					//First, get the type that they should have
+					Type* type = declList->getType(s);
+					InitDeclarator* initDecl = NULL;
+					NodeList<InitDeclarator>* initListTemp = initList;
+					while ((initDecl = initListTemp->getItem()) != NULL && \
+							initListTemp->getNext() != NULL)  {
+						initDecl-> insert(s, type);
+						initListTemp = initListTemp->getNext();
+					}
+					if ((initDecl = initListTemp->getItem()) != NULL) {
+						initDecl-> insert(s, type);
+					}
+					return true;
+				}
+			}
+		}
 		DeclarationSpecifierList* declList = NULL;
 		InitDeclaratorList* initList = NULL;
 };
@@ -903,11 +1297,128 @@ class FunctionDefinition : public Node {
 			if (declList != NULL) {delete declList;}
 			if (state != NULL) {delete state;}
 		}
+		virtual Type* getType(Scope* s) {
+			if (typeOfThis == NULL) {
+				ParameterTypeListDirectDeclarator* paramDirDecl = NULL;
+				if (!(paramDirDecl = dynamic_cast<ParameterTypeListDirectDeclarator*>\
+							(decl->getDirectDeclarator()->getNext()))) {
+					string err = "Expected parameter type list in function "\
+								  "declaration";
+					throw new TypeError(err);
+				}
+				ParameterTypeList* paramList = paramDirDecl->getParams();
+				TypeList* paramTypes = NULL;
+				list<string>* paramNames = new list<string>();
+				if (paramList != NULL) {
+					paramTypes = paramList->getTypes(s);
+					paramList->getNames(s, paramNames);
+					typeOfThis = new FunctionType(declSpecList->getType(s), paramTypes);
+					ParameterList::enterTypes(s, paramTypes, \
+							paramNames);
+				}
+			} else {
+				typeOfThis = new FunctionType(declSpecList->getType(s), \
+						new TypeList(new NoType()));
+			}
+			return typeOfThis;
+		}
+		virtual bool typeCheck(Scope* s) {
+			//TODO: Improve this
+			bool ret = true;
+			DirectDeclarator* dirDecl = decl->getDirectDeclarator();
+			//Expect that dirDecl is an identifier direct declarator,
+			//i.e. the name of the function
+			IdentifierDirectDeclarator* idDirDecl = NULL;
+			if (!(idDirDecl = dynamic_cast<IdentifierDirectDeclarator*>\
+						(dirDecl))) {
+					string err = "Expected direct declarator with identifier type"\
+								  " in function definition";
+					throw new TypeError(err);
+			}
+			//Fetch name of function
+			string name = idDirDecl->getIdentifier()->getName();
+			//Add this function to the scope, unless it is already declared
+			//Create local scope for the function
+			Scope* functionScope = new Scope(s);
+			//Insert all parameters into the functionScope
+			//Do this by first getting the next DirectDeclarator from the first
+			//one and downcast to ParameterTypeListDirectDeclarator
+			ParameterTypeListDirectDeclarator* paramDirDecl = NULL;
+			if (!(paramDirDecl = dynamic_cast<ParameterTypeListDirectDeclarator*>\
+						(dirDecl->getNext()))) {
+				string err = "Expected parameter type list in function "\
+							  "declaration";
+				throw new TypeError(err);
+			}
+			//Then get all the types from the ParameterTypeList
+			ParameterTypeList* paramList = paramDirDecl->getParams();
+			TypeList* paramTypes = NULL;
+			list<string>* paramNames = new list<string>();
+			if (paramList != NULL) {
+				paramTypes = paramList->getTypes(functionScope);
+				paramList->getNames(functionScope, paramNames);
+				typeOfThis = new FunctionType(declSpecList->getType(s), paramTypes);
+				ParameterList::enterTypes(functionScope, paramTypes, \
+						paramNames);
+			} else {
+				typeOfThis = new FunctionType(declSpecList->getType(s), \
+						new TypeList(new NoType()));
+			}
+			//Else, no parameters, which is OK
+			//And enter the special case 'return' as well
+			functionScope->insert("return", declSpecList->getType(s));
+			//Seriously not sure what to do with declList, this is my best guess
+			if (declList != NULL) {
+				ret = ret && declList->typeCheck(functionScope);
+			}
+			//Just type check the compound statement
+			ret = ret && state->typeCheck(functionScope);
+			if (ret == false) {
+				string err = "Error when type checking function definition of '" +\
+							  name + "'";
+				throw new TypeError(err);
+			}
+			return ret;
+		}
+		string genLLVM(Scope* oldScope, Consumer<string>* o) {
+			Scope* s = new Scope(oldScope);
+			o->put("\n;Function Attrs: ");
+			//TODO: Implement function attributes, if necessary
+			o->put("\ndefine ");
+			FunctionType* type = dynamic_cast<FunctionType*>(this->getType(s));
+			Type* returnType = type->getReturnType();
+			if (returnType != NULL) {
+				o->put(returnType->getLLVMName() + " @");
+			} else {
+				o->put("void @");
+			}
+			//Enter parameters, with types and %names
+			IdentifierDirectDeclarator* dirDecl \
+				= dynamic_cast<IdentifierDirectDeclarator*>\
+				(decl->getDirectDeclarator());
+			if (dirDecl == NULL) {
+				string err = "Expected identifier as function name";
+				throw new TypeError(err);
+			}
+			o->put(dirDecl->getIdentifier()->getName() + "(");
+			ParameterTypeListDirectDeclarator* paramDirDecl \
+				= dynamic_cast<ParameterTypeListDirectDeclarator*>\
+				(dirDecl->getNext());
+			if (paramDirDecl == NULL) {
+				string err = "Expected parameter list in function declaration";
+				throw new TypeError(err);
+			}
+			paramDirDecl->genLLVM(s, o);
+			o->put(") ");
+			state->genLLVM(s, o, paramDirDecl);
+			return "";
+		}
 	private:
 		DeclarationSpecifierList* declSpecList = NULL;
 		Declarator* decl = NULL;
 		DeclarationList* declList = NULL; //Optional
 		CompoundStatement* state = NULL;
+		FunctionType* typeOfThis = NULL; //Set when running getType(s)
 };
 
 class TypeSpecifier : public DeclarationSpecifier {
@@ -1229,6 +1740,21 @@ class StandardAssignment : public Assignment<&StandardAssignmentOpStr> {
 			: Assignment(parser, lhs) {}
 		static StandardAssignment* create(Parser* parser, Expression* lhs)\
 	   	{return new StandardAssignment(parser, lhs);}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			//Assume that the name of rhs is an identifier and store the
+			//result of rhs there
+			string type = lhs->getType(s)->getLLVMName();
+			if (ConstantExpression* constDowncast = \
+						dynamic_cast<ConstantExpression*>(rhs)) {
+				o->put("store " + type + " " + constDowncast->getName() + ", "\
+						+ type + "* " + "%" + lhs->getName());
+			} else {
+				string temp = rhs->genLLVM(s, o);
+				o->put("\nstore " + type + " " + temp + ", " + type + "* " + \
+						"%" + lhs->getName());
+			}
+			return "";
+		}
 };
 
 const string MultiplicationAssignmentOpStr = "*=";
@@ -1356,6 +1882,9 @@ class BitwiseOR : public BinaryOperator<Expression, &BitwiseOROpStr, BITWISE_OR>
 			: BinaryOperator(parser, lhs) {}
 		static BitwiseOR* create(Parser* parser, Expression* lhs)\
 	   	{return new BitwiseOR(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			return "or";
+		}
 };
 
 const string BitwiseXOROpStr = "^";
@@ -1365,6 +1894,9 @@ class BitwiseXOR : public BinaryOperator<Expression, &BitwiseXOROpStr, BITWISE_X
 			: BinaryOperator(parser, lhs) {}
 		static BitwiseXOR* create(Parser* parser, Expression* lhs)\
 	   	{return new BitwiseXOR(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			return "xor";
+		}
 };
 
 const string BitwiseANDOpStr = "&";
@@ -1374,6 +1906,9 @@ class BitwiseAND : public BinaryOperator<Expression, &BitwiseANDOpStr , BITWISE_
 			: BinaryOperator(parser, lhs) {}
 		static BitwiseAND* create(Parser* parser, Expression* lhs)\
 	   	{return new BitwiseAND(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			return "and";
+		}
 };
 
 const string EqualityOpStr = "==";
@@ -1383,6 +1918,21 @@ class Equality : public BinaryOperator<Expression, &EqualityOpStr, EQUALITY> {
 			: BinaryOperator(parser, lhs) {}
 		static Equality* create(Parser* parser, Expression* lhs)\
 	   	{return new Equality(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fcmp ueq";
+					case DOUBLE : return "fcmp ueq";
+					case LONG_DOUBLE : return "fcmp ueq";
+					default : return "icmp eq";
+				}
+			}
+			return "icmp eq";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string NonEqualityOpStr = "!=";
@@ -1392,6 +1942,21 @@ class NonEquality : public BinaryOperator<Expression, &NonEqualityOpStr, EQUALIT
 			: BinaryOperator(parser, lhs) {}
 		static NonEquality* create(Parser* parser, Expression* lhs)\
 	   	{return new NonEquality(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fcmp une";
+					case DOUBLE : return "fcmp une";
+					case LONG_DOUBLE : return "fcmp une";
+					default : return "icmp ne";
+				}
+			}
+			return "icmp ne";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string LessThanOpStr = "<";
@@ -1401,6 +1966,26 @@ class LessThan : public BinaryOperator<Expression, &LessThanOpStr, RELATIONAL> {
 			: BinaryOperator(parser, lhs) {}
 		static LessThan* create(Parser* parser, Expression* lhs)\
 	   	{return new LessThan(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp ult";
+					case UNSIGNED_SHORT_INT : return "icmp ult";
+					case UNSIGNED_INT : return "icmp ult";
+					case UNSIGNED_LONG_INT : return "icmp ult";
+					case UNSIGNED_LONG_LONG_INT : return "icmp ult";
+					case FLOAT : return "fcmp ult";
+					case DOUBLE : return "fcmp ult";
+					case LONG_DOUBLE : return "fcmp ult";
+					default : return "icmp slt";
+				}
+			}
+			return "icmp slt";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string GreaterThanOpStr = ">";
@@ -1410,6 +1995,26 @@ class GreaterThan : public BinaryOperator<Expression, &GreaterThanOpStr, RELATIO
 			: BinaryOperator(parser, lhs) {}
 		static GreaterThan* create(Parser* parser, Expression* lhs)\
 	   	{return new GreaterThan(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp ugt";
+					case UNSIGNED_SHORT_INT : return "icmp ugt";
+					case UNSIGNED_INT : return "icmp ugt";
+					case UNSIGNED_LONG_INT : return "icmp ugt";
+					case UNSIGNED_LONG_LONG_INT : return "icmp ugt";
+					case FLOAT : return "fcmp ugt";
+					case DOUBLE : return "fcmp ugt";
+					case LONG_DOUBLE : return "fcmp ugt";
+					default : return "icmp sgt";
+				}
+			}
+			return "icmp sgt";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string LessThanOrEqualOpStr = "<=";
@@ -1419,6 +2024,26 @@ class LessThanOrEqual : public BinaryOperator<Expression, &LessThanOrEqualOpStr,
 			: BinaryOperator(parser, lhs) {}
 		static LessThanOrEqual* create(Parser* parser, Expression* lhs)\
 	   	{return new LessThanOrEqual(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp ule";
+					case UNSIGNED_SHORT_INT : return "icmp ule";
+					case UNSIGNED_INT : return "icmp ule";
+					case UNSIGNED_LONG_INT : return "icmp ule";
+					case UNSIGNED_LONG_LONG_INT : return "icmp ule";
+					case FLOAT : return "fcmp ule";
+					case DOUBLE : return "fcmp ule";
+					case LONG_DOUBLE : return "fcmp ule";
+					default : return "icmp sle";
+				}
+			}
+			return "icmp sle";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string GreaterThanOrEqualOpStr = ">=";
@@ -1428,6 +2053,26 @@ class GreaterThanOrEqual : public BinaryOperator<Expression, &GreaterThanOrEqual
 			: BinaryOperator(parser, lhs) {}
 		static GreaterThanOrEqual* create(Parser* parser, Expression* lhs)\
 	   	{return new GreaterThanOrEqual(parser, lhs);}
+		string getLLVMOpName(Type *t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "icmp uge";
+					case UNSIGNED_SHORT_INT : return "icmp uge";
+					case UNSIGNED_INT : return "icmp uge";
+					case UNSIGNED_LONG_INT : return "icmp uge";
+					case UNSIGNED_LONG_LONG_INT : return "icmp uge";
+					case FLOAT : return "fcmp uge";
+					case DOUBLE : return "fcmp uge";
+					case LONG_DOUBLE : return "fcmp uge";
+					default : return "icmp sge";
+				}
+			}
+			return "icmp sge";
+		}
+		Type* getType(Scope* s) {
+			return new BasicType(_BOOL);
+		}
 };
 
 const string ShiftLeftOpStr = "<<";
@@ -1437,6 +2082,9 @@ class ShiftLeft : public BinaryOperator<Expression, &ShiftLeftOpStr, SHIFT> {
 			: BinaryOperator(parser, lhs) {}
 		static ShiftLeft* create(Parser* parser, Expression* lhs)\
 	   	{return new ShiftLeft(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			return "shl";
+		}
 };
 
 const string ShiftRightOpStr = ">>";
@@ -1446,6 +2094,9 @@ class ShiftRight : public BinaryOperator<Expression, &ShiftRightOpStr, SHIFT> {
 			: BinaryOperator(parser, lhs) {}
 		static ShiftRight* create(Parser* parser, Expression* lhs)\
 	   	{return new ShiftRight(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			return "lshr";
+		}
 };
 
 const string AdditionOpStr = "+";
@@ -1455,6 +2106,19 @@ class Addition : public BinaryOperator<Expression, &AdditionOpStr, ADDITIVE> {
 			: BinaryOperator(parser, lhs) {}
 		static Addition* create(Parser* parser, Expression* lhs) \
 		{return new Addition(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fadd";
+					case DOUBLE : return "fadd";
+					case LONG_DOUBLE : return "fadd";
+					default : return "add";
+				}
+			} else {
+				return "add";
+			}
+		}
 };
 
 const string SubtractionOpStr = "-";
@@ -1464,6 +2128,19 @@ class Subtraction : public BinaryOperator<Expression, &SubtractionOpStr, ADDITIV
 			: BinaryOperator(parser, lhs) {}
 		static Subtraction* create(Parser* parser, Expression* lhs) \
 		{return new Subtraction(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fsub";
+					case DOUBLE : return "fsub";
+					case LONG_DOUBLE : return "fsub";
+					default : return "sub";
+				}
+			} else {
+				return "sub";
+			}
+		}
 };
 
 const string MultiplicationOpStr = "*";
@@ -1473,6 +2150,19 @@ class Multiplication : public BinaryOperator<Expression, &MultiplicationOpStr, M
 			: BinaryOperator(parser, lhs) {}
 		static Multiplication* create(Parser* parser, Expression* lhs) \
 		{return new Multiplication(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case FLOAT : return "fmul";
+					case DOUBLE : return "fmul";
+					case LONG_DOUBLE : return "fmul";
+					default : return "mul";
+				}
+			} else {
+				return "mul";
+			}
+		}
 };
 
 const string DivisionOpStr = "/";
@@ -1482,6 +2172,23 @@ class Division : public BinaryOperator<Expression, &DivisionOpStr, MULTIPLICATIV
 			: BinaryOperator(parser, lhs) {}
 		static Division* create(Parser* parser, Expression* lhs) \
 		{return new Division(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "udiv";
+					case UNSIGNED_SHORT_INT : return "udiv";
+					case UNSIGNED_INT : return "udiv";
+					case UNSIGNED_LONG_INT : return "udiv";
+					case UNSIGNED_LONG_LONG_INT : return "udiv";
+					case FLOAT : return "fdiv";
+					case DOUBLE : return "fdiv";
+					case LONG_DOUBLE : return "fdiv";
+					default : return "sdiv";
+				}
+			}
+			return "sdiv";
+		}
 };
 
 const string ModuloOpStr = "%";
@@ -1491,6 +2198,24 @@ class Modulo : public BinaryOperator<Expression, &ModuloOpStr, MULTIPLICATIVE> {
 			: BinaryOperator(parser, lhs) {}
 		static Modulo* create(Parser* parser, Expression* lhs) \
 		{return new Modulo(parser, lhs);}
+		string getLLVMOpName(Type* t) {
+			if (BasicType* basicType = dynamic_cast<BasicType*>(t)) {
+				BasicTypeEnum val = basicType->getBasicType();
+				switch (val) {
+					case UNSIGNED_CHAR : return "urem";
+					case UNSIGNED_SHORT_INT : return "urem";
+					case UNSIGNED_INT : return "urem";
+					case UNSIGNED_LONG_INT : return "urem";
+					case UNSIGNED_LONG_LONG_INT : return "urem";
+					case FLOAT : return "frem";
+					case DOUBLE : return "frem";
+					case LONG_DOUBLE : return "frem";
+					default : return "srem";
+				}
+			}
+			return "srem";
+		}
+
 };
 
 const string TypeCastOpStr = "(";
@@ -1778,6 +2503,33 @@ class ArraySubscript : public BinaryOperator<Expression, &ArraySubscriptOpStr, P
 		}
 };
 
+class ArgumentList : public Expression {
+	public:
+		ArgumentList(Expression* assignExpr, ArgumentList* next) : \
+			Expression(DEFAULT), expr(assignExpr), next(next) {}
+		void parse(Parser* parser) {
+		}
+		string getName() {
+			string ret = "";
+			if (expr != NULL) {ret += expr->getName();}
+			if (next != NULL) {ret += next->getName();}
+			return ret;
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			string ret = "";
+			if (expr != NULL) {
+				ret += expr->getType(s)->getLLVMName() + " " + expr->genLLVM(s, o);
+			}
+			if (next != NULL) {
+				ret += ", " + next->genLLVM(s, o);
+			}
+			return ret;
+		}
+	private:
+		Expression* expr = NULL;
+		ArgumentList* next = NULL;
+};
+
 const string FunctionCallOpStr = "(";
 class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTFIX> {
 	public:
@@ -1786,8 +2538,9 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 		static FunctionCall* create(Parser* parser, Expression* lhs) \
 		{return new FunctionCall(parser, lhs);}
 		void parse(Parser* parser) {
-			rhs = parser->parseExpression(); //With DEFAULT priority, since we're in a
-			//pair of parenthesis
+			if (parser->getSource()->peek().getName() != ")") {
+			rhs = parser->parseArgumentList();
+			}
 			Token token = parser->getSource()->get();
 			if (token.getName() != ")") {
 				string err = "Expected ')' at end of function ";
@@ -1806,6 +2559,30 @@ class FunctionCall : public BinaryOperator<Expression, &FunctionCallOpStr, POSTF
 				ret += ")";
 				return ret;
 			}
+		}
+		string genLLVM(Scope* s, Consumer<string>* o) {
+			string retOp = "";
+			Symbol* returnSymbol = s->find(lhs->getName());
+			string arguments = rhs->genLLVM(s, o);
+			o->put("\n");
+			if (returnSymbol != NULL) {
+				retOp = "%" + to_string(s->getTemp());
+				o->put(retOp + " = ");
+				o->put("call ");
+				Type* returnType = returnSymbol->getType();
+				if (returnType != NULL) {
+					o->put(returnType->getLLVMName());
+				} else {
+					o->put("void");
+				}
+				o->put(" @" + lhs->getName() + "(");
+				o->put(arguments);
+				o->put(")");
+			} else {
+				string err = "Unknown return type of function";
+				throw new TypeError(err);
+			}
+			return retOp;
 		}
 };
 
@@ -1913,9 +2690,40 @@ void PostfixOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
 }
 
 template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
-void BinaryOperator<Op, opStrTemp, prioTemp>::parse(Parser* parser) {
+void BinaryOperator<Op, opStrTemp, prioTemp> :: parse(Parser* parser) {
 	rhs = parser->parseExpression(prioTemp);
 }
+
+template<class Op, const string* opStrTemp, PriorityEnum prioTemp>
+string BinaryOperator<Op, opStrTemp, prioTemp> :: genLLVM(Scope* s, Consumer<string>* o) {
+	string op1 = "%";
+	string op2 = "%";
+	IdentifierExpression* downcast = NULL;
+	ConstantExpression* downcastConst = NULL;
+	//If lhs is a variable name, use that as an operand.
+	//Otherwise, compute the result and store it in a temporary
+	//Also checks for constants instead of using temporaries
+	if ((downcastConst = dynamic_cast<ConstantExpression*>(lhs))) {
+		op1 = downcastConst->getName();
+	} else {
+		op1 = lhs->genLLVM(s, o);
+		o->put("\n");
+	}
+	//Same for rhs
+	if ((downcastConst = dynamic_cast<ConstantExpression*>(rhs))) {
+		op2 = downcastConst->getName();
+	} else {
+		op2 = rhs->genLLVM(s, o);
+		o->put("\n");
+	}
+	string result = "%" + to_string(s->getTemp());
+	o->put(result + " = ");
+	o->put(this->getLLVMOpName(lhs->getType(s)) + " ");
+	o->put(lhs->getType(s)->getLLVMName() + " ");
+	o->put(op1 + ", " + op2 );
+	return result;
+}
+
 
 template<class Left, class Middle, class Right, const string* opStrFirst, const string* opStrSecond, PriorityEnum prioTemp>
 void TernaryOperator<Left, Middle, Right, opStrFirst, opStrSecond, prioTemp> :: parse(Parser* parser) {
@@ -1929,4 +2737,6 @@ void TernaryOperator<Left, Middle, Right, opStrFirst, opStrSecond, prioTemp> :: 
 		throw new SyntaxException(err);
 	}
 }
+
+
 

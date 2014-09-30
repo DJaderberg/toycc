@@ -1,7 +1,7 @@
 CC      = g++
 CFLAGS  = -Wall -Wextra -std=c++11
 LDFLAGS = 
-OBJECTS = translation.o preprocessing.o source.o syntax.o
+OBJECTS = translation.o preprocessing.o source.o syntax.o abstractSyntax.o
 all: translation 
 
 translation: $(OBJECTS)
@@ -9,6 +9,7 @@ translation: $(OBJECTS)
 
 syntax.o : syntax.cpp syntax.h abstractSyntax.h
 	$(CC) -c $(CFLAGS) $<
+
 %.o: %.cpp %.h
 	$(CC) -c $(CFLAGS) $<
 

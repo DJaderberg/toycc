@@ -7,6 +7,56 @@ string ExternalDeclaration :: getName() {
 	return ret;
 }
 
+string ExternalDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (funcDef != NULL) {return funcDef->genLLVM(s, o);}
+	if (decl != NULL) {
+		//TODO: Implement global declarations
+		return decl->genLLVM(s, o);
+	}
+	return "";
+}
+
+string CompoundStatement :: genLLVM(Scope* s, Consumer<string>* o, ParameterTypeListDirectDeclarator* paramDirDecl) {
+			if  (paramDirDecl != NULL) {
+				if (ParameterTypeList* paramTypeList = paramDirDecl->getParams()) {
+					o->put("{");
+					TypeList* typeList = paramTypeList->getTypes(s);
+					list<string>* nameList = new list<string>();
+					paramTypeList->getNames(s, nameList);
+					string curTypeName = "";
+					unsigned int iter = 1;
+					while (typeList != NULL && !nameList->empty()) {
+						curTypeName = typeList->getItem()->getLLVMName();
+						o->put("\n%" + nameList->front() + " = alloca ");
+						o->put(curTypeName);
+						o->put("\nstore " + curTypeName + " %__arg_");
+						o->put(to_string(iter) + ", " + curTypeName);
+						o->put("* %" + nameList->front() + "\n");
+						nameList->pop_front();
+						typeList = typeList->getNext();
+						++iter;
+					}
+					//Handle 'void' argument
+					if (typeList != NULL && typeList->getItem() != NULL && \
+							typeList->getItem()->getLLVMName() == "void") {
+						typeList = NULL;
+						o->put("\n");
+					}
+					if (typeList != NULL || !nameList->empty()) {
+						string err = "Mismatched number of types and names";
+						throw new TypeError(err);
+					}
+					Scope* localScope = new Scope(s);
+					itemList->genLLVM(localScope, o);
+					delete localScope;
+					o->put("\n}\n");
+					return "";
+				}
+		}
+		return this->genLLVM(s, o);
+}
+
+
 ParameterDeclaration :: ~ParameterDeclaration() {
 	if (declSpecList != NULL) {delete declSpecList;}
 	if (decl != NULL) {delete decl;}
@@ -17,6 +67,29 @@ string ParameterDeclaration :: getName() {
 	if (declSpecList != NULL) {ret += declSpecList->getName();}
 	if (decl != NULL) {ret += decl->getName();}
 	return ret;
+}
+
+string ParameterDeclaration :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (declSpecList != NULL) {
+		//Should never need scope in getting type
+		Type* declSpecType = declSpecList->getType(s);
+		string typeName = declSpecType->getLLVMName();
+		if (typeName != "void") {
+			//A parameter of 'void' in C is nothing in LLVM IR, eg.
+			//C: int main(void)
+			//becomes
+			//LLVM IR: i64 @main()
+			//So, do not enter anything if typeName is void
+			o->put(typeName);
+		}
+		delete declSpecType;
+	}
+	if (decl != NULL) {o->put(" %__arg_" + to_string(s->getTemp()));}
+	return "";
+}
+
+Type* ParameterDeclaration :: getType(Scope* s) {
+	return declSpecList->getType(s);
 }
 
 ParameterTypeListDirectDeclarator :: ~ParameterTypeListDirectDeclarator() {
@@ -54,6 +127,24 @@ string BlockItem :: getName() {
 	return "";
 }
 
+bool BlockItem :: typeCheck(Scope* s) {
+	if (decl != NULL) {return decl->typeCheck(s);}
+	if (state != NULL) {return state->typeCheck(s);}
+	return false;
+}
+
+Type* BlockItem :: getType(Scope* s) {
+	if (decl != NULL) {return decl->getType(s);}
+	if (state != NULL) {return state->getType(s);}
+	return new NoType();
+}
+
+string BlockItem :: genLLVM(Scope* s, Consumer<string>* o) {
+	if (decl != NULL) {return decl->genLLVM(s, o);}
+	if (state != NULL) {return state->genLLVM(s, o);}
+	return "";
+}
+
 string Pointer :: getName() {
 	string ret = "*";
 	if (typeQualList != NULL) {ret += typeQualList->getName();}
@@ -65,14 +156,18 @@ Pointer :: ~Pointer() {
 	if (next != NULL) {delete next;}
 }
 
-/*TranslationUnit* Parser :: parseTranslationUnit() {
-	list<ExternalDeclaration*> list;
-	ExternalDeclaration* ptr;
-	while ((ptr = parseExternalDeclaration())) {
-		list.push_back(ptr);
+TranslationUnit* Parser :: parseTranslationUnit() {
+	TranslationUnit* ret = NULL;
+	ExternalDeclaration* decl = NULL;
+	decl = parseExternalDeclaration();
+	if (decl == NULL) {
+		return NULL;
+	} else {
+		TranslationUnit* next = parseTranslationUnit();
+		ret = new TranslationUnit(decl, next);
 	}
-	return new TranslationUnit(list);
-}*/
+	return ret;
+}
 
 ExternalDeclaration* Parser :: parseExternalDeclaration() {
 	/* First, attempt to parse as a declaration, using the trailing ';' to 
@@ -92,7 +187,9 @@ ExternalDeclaration* Parser :: parseExternalDeclaration() {
 		//Not a declaration, try a function definition instead
 		source->setUsed(bufferUsed);
 		FunctionDefinition* funcDef = parseFunctionDefinition();
-		ret = new ExternalDeclaration(funcDef);
+		if (funcDef != NULL) {
+			ret = new ExternalDeclaration(funcDef);
+		}
 	}
 	return ret;
 }
@@ -203,7 +300,7 @@ BlockItem* Parser :: parseBlockItem() {
 	}
 	if (state != NULL && decl != NULL) {
 		//Both matches, compare length
-		if (state->getName().length() > decl->getName().length()) {
+		if (stateUsed >= declUsed) {
 			source->setUsed(stateUsed);
 			ret = new BlockItem(state);
 		} else {
@@ -1025,6 +1122,16 @@ Initializer* Parser :: parseInitializer() {
 	return new Initializer(expr);
 }
 
+ArgumentList* Parser :: parseArgumentList() {
+	Expression* expr = parseExpression(ASSIGNMENT);
+	if (source->peek().getName() == ",") {
+		source->get();
+		return new ArgumentList(expr, parseArgumentList());
+	} else {
+		return new ArgumentList(expr, NULL);
+	}
+}
+
 void Parser :: c11Operators() {
 	//Prefix
 	this->mPrefix["+"] = (Operator* (*)(Parser*)) UnaryPlus::create;
@@ -1125,4 +1232,96 @@ void Parser :: declarationSpecifiers() {
 	//Alignment specifiers
 	this->mAlignmentSpecifier["_Alignas"] = "_Alignas";
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+//Type checking
+
+
+bool ExternalDeclaration :: typeCheck(Scope* s) {
+	if (funcDef != NULL) return funcDef->typeCheck(s);
+	if (decl != NULL) return decl->typeCheck(s);
+	return false;
+}
+
+Type* DeclarationSpecifierList :: getType(Scope* s) {
+	Type* ret = NULL;
+	string basicTypeName = "";
+	DeclarationSpecifier* curItem = item;
+	NodeList<DeclarationSpecifier>* curNext = next;
+	TypeSpecifier* curTypeSpec = NULL;
+	//Add all type specifiers to the string
+	while ((curTypeSpec = dynamic_cast<TypeSpecifier*>(curItem))) {
+		basicTypeName += curTypeSpec->getName();
+		if (curNext != NULL) {
+			curItem = curNext->getItem();
+			curNext = curNext->getNext();
+			basicTypeName += " ";
+		} else {
+			break;
+		}
+	}
+	auto search = mBasicTypes.find(basicTypeName);
+	if (search != mBasicTypes.end()) {
+		ret = new BasicType(search->second);
+	} else if (basicTypeName == "void") {
+		ret = new NoType();
+	}
+	return ret;
+}
+
+map<string, BasicTypeEnum> DeclarationSpecifierList :: mBasicTypes \
+		= DeclarationSpecifierList::initBasicTypesMap();
+
+map<string, BasicTypeEnum> DeclarationSpecifierList :: initBasicTypesMap() {
+	map<string, BasicTypeEnum> ret = {\
+		{"_Bool", _BOOL}, {"char", CHAR}, {"signed char", SIGNED_CHAR}, \
+		{"unsigned char", UNSIGNED_CHAR}, {"short int", SHORT_INT}, \
+		{"unsigned short int", UNSIGNED_SHORT_INT}, {"int", INT}, \
+		{"unsigned int", UNSIGNED_INT}, {"long int", LONG_INT}, \
+		{"unsigned long int", UNSIGNED_LONG_INT}, \
+		{"long long int", LONG_LONG_INT}, \
+		{"unsigned long long int", UNSIGNED_LONG_LONG_INT}, \
+		{"float", FLOAT}, {"double", DOUBLE}, {"long double", LONG_DOUBLE}, \
+		{"short", SHORT_INT}, {"signed short", SHORT_INT}, \
+		{"signed short int", SHORT_INT}, {"unsigned short", UNSIGNED_SHORT_INT},\
+		{"signed", INT}, {"signed int", INT}, {"unsigned", UNSIGNED_INT}, \
+		{"long", LONG_INT}, {"signed long", LONG_INT}, \
+		{"signed long int", LONG_INT}, {"unsigned long", UNSIGNED_LONG_INT}, \
+		{"long long", LONG_LONG_INT}, {"signed long long", LONG_LONG_INT}, \
+		{"signed long long int", LONG_LONG_INT}\
+	};
+	return ret;
+}
+
+bool Declarator ::  insert(Scope* s, Type* t) {
+	Pointer* ptrTmp = pointer;
+	while (ptrTmp != NULL) {
+		t = new PointerType(t);
+		ptrTmp = ptrTmp->getNext();
+	}
+	return dirDecl->insert(s, t);
+}
+
+Type* Constant :: getType(string str) {
+	string::size_type search = str.find('.');
+	if (search != string::npos) {
+		//double
+		return new BasicType(DOUBLE);
+	} else {
+		//int
+		return new BasicType(INT);
+	}
+}
+
 
