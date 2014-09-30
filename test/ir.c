@@ -7,18 +7,18 @@ int main(void) {
 	temp = 4;
 	temp = func(temp, 16);
 	temp = temp + square(8);
-	temp = func2(10);
+	temp = func2(16);
 	return temp;
 }
 
 int func2(int limit) {
 	int i;
 	i = 0;
-	/*do {
+	do {
 		i = i + 1;
 	} while (i < limit);
-	i = 0;*/
-	while (i < limit) {
+	i = 0;
+	while (i < 2*limit) {
 		i = i + 1;
 	}
 	return i;
